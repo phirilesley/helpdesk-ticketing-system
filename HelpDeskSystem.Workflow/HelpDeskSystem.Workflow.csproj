@@ -6,4 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\HelpDeskSystem.Domain\HelpDeskSystem.Domain.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.Persistence\HelpDeskSystem.Persistence.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.Application\HelpDeskSystem.Application.csproj" />
+  </ItemGroup>
+
 </Project>

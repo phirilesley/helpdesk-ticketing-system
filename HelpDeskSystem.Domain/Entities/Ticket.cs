@@ -15,6 +15,9 @@ public class Ticket : BaseEntity
     public int? AssignedToUserId { get; set; }
     public DateTime? ClosedAtUtc { get; set; }
     public DateTime? DueAtUtc { get; set; }
+    public bool IsSlaPaused { get; set; }
+    public DateTime? SlaPausedAtUtc { get; set; }
+    public int SlaPausedTotalMinutes { get; set; }
     public int TenantId { get; set; }
 
     // Navigation properties

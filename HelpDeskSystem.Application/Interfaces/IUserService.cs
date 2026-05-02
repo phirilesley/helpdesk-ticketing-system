@@ -12,4 +12,8 @@ public interface IUserService
     Task DeleteUserAsync(int id);
     Task AssignRoleToUserAsync(int userId, int roleId);
     Task<bool> ValidatePasswordAsync(string email, string password);
+    Task<string> SetMfaSecretAsync(int userId);
+    Task<bool> EnableMfaAsync(int userId, string code);
+    Task DisableMfaAsync(int userId);
+    Task<bool> VerifyMfaCodeAsync(int userId, string code);
 }

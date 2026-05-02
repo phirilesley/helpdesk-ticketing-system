@@ -14,17 +14,20 @@ public class SlaService : ISlaService
     private readonly ITicketService _ticketService;
     private readonly INotificationService _notificationService;
     private readonly IAuditService _auditService;
+    private readonly IBusinessTimeService _businessTimeService;
 
     public SlaService(
         HelpDeskDbContext context,
         ITicketService ticketService,
         INotificationService notificationService,
-        IAuditService auditService)
+        IAuditService auditService,
+        IBusinessTimeService businessTimeService)
     {
         _context = context;
         _ticketService = ticketService;
         _notificationService = notificationService;
         _auditService = auditService;
+        _businessTimeService = businessTimeService;
     }
 
     public async Task<SlaResult> CalculateSlaForTicketAsync(int ticketId)
@@ -42,11 +45,22 @@ public class SlaService : ISlaService
         if (slaRule == null) return new SlaResult { IsBreached = false };
 
         var now = DateTime.UtcNow;
-        var responseDeadline = ticket.CreatedAtUtc.AddMinutes(slaRule.ResponseTimeMinutes);
-        var resolutionDeadline = ticket.CreatedAtUtc.AddMinutes(slaRule.ResolutionTimeMinutes);
+        var responseDeadline = await _businessTimeService.AddBusinessMinutesAsync(ticket.TenantId, ticket.CreatedAtUtc, slaRule.ResponseTimeMinutes);
+        var resolutionDeadline = await _businessTimeService.AddBusinessMinutesAsync(ticket.TenantId, ticket.CreatedAtUtc, slaRule.ResolutionTimeMinutes);
 
-        var isResponseBreached = now > responseDeadline && ticket.Status == TicketStatus.New;
-        var isResolutionBreached = now > resolutionDeadline && ticket.Status != TicketStatus.Closed;
+        var pausedMinutes = ticket.SlaPausedTotalMinutes;
+        if (ticket.IsSlaPaused && ticket.SlaPausedAtUtc.HasValue)
+        {
+            pausedMinutes += (int)Math.Max(0, Math.Floor((now - ticket.SlaPausedAtUtc.Value).TotalMinutes));
+        }
+        if (pausedMinutes > 0)
+        {
+            responseDeadline = responseDeadline.AddMinutes(pausedMinutes);
+            resolutionDeadline = resolutionDeadline.AddMinutes(pausedMinutes);
+        }
+
+        var isResponseBreached = !ticket.IsSlaPaused && now > responseDeadline && ticket.Status == TicketStatus.New;
+        var isResolutionBreached = !ticket.IsSlaPaused && now > resolutionDeadline && ticket.Status != TicketStatus.Closed;
 
         return new SlaResult
         {

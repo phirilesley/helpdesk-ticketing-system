@@ -32,22 +32,26 @@ namespace HelpDeskSystem.Persistence.Migrations
 
                     b.Property<string>("Action")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("EntityId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("EntityName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<string>("IpAddress")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -65,6 +69,14 @@ namespace HelpDeskSystem.Persistence.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("Action", "CreatedAtUtc");
+
+                    b.HasIndex("UserId", "CreatedAtUtc");
+
+                    b.HasIndex("EntityName", "EntityId", "CreatedAtUtc");
 
                     b.ToTable("AuditLogs");
                 });
@@ -127,6 +139,59 @@ namespace HelpDeskSystem.Persistence.Migrations
                     b.ToTable("AutomationRules");
                 });
 
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.BusinessHoursProfile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeOnly>("EndLocalTime")
+                        .HasColumnType("time");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<TimeOnly>("StartLocalTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("WorkingDays")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "IsDefault");
+
+                    b.ToTable("BusinessHoursProfiles");
+                });
+
             modelBuilder.Entity("HelpDeskSystem.Domain.Entities.EscalationRule", b =>
                 {
                     b.Property<int>("Id")
@@ -162,6 +227,264 @@ namespace HelpDeskSystem.Persistence.Migrations
                     b.HasIndex("PriorityId");
 
                     b.ToTable("EscalationRules");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.InboundEmailLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedTicketId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ErrorMessage")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ExternalMessageId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("FromEmail")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ProcessingStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalMessageId")
+                        .IsUnique();
+
+                    b.ToTable("InboundEmailLogs");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.KnowledgeBaseArticle", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("PublishedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SearchKeywords")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("TenantId", "Slug")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "IsPublished", "CreatedAtUtc");
+
+                    b.ToTable("KnowledgeBaseArticles");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.KnowledgeBaseArticleFeedback", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ArticleId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Comment")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsHelpful")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArticleId", "UserId");
+
+                    b.ToTable("KnowledgeBaseArticleFeedback");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.KnowledgeBaseArticleVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ArticleId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ChangeNote")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ChangedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArticleId");
+
+                    b.ToTable("KnowledgeBaseArticleVersions");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.KnowledgeBaseCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPublic")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("KnowledgeBaseCategories");
                 });
 
             modelBuilder.Entity("HelpDeskSystem.Domain.Entities.Notification", b =>
@@ -441,6 +764,97 @@ namespace HelpDeskSystem.Persistence.Migrations
                     b.ToTable("Tenants");
                 });
 
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.TenantPortalSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BrandName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LogoUrl")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PrimaryColor")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SupportEmail")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("WelcomeMessage")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
+
+                    b.ToTable("TenantPortalSettings");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.TenantSecurityPolicy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AllowedIpRanges")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("BlockInboundEmailTicketCreation")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("RequireMfaForPrivilegedUsers")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ScimBearerTokenHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
+
+                    b.ToTable("TenantSecurityPolicies");
+                });
+
             modelBuilder.Entity("HelpDeskSystem.Domain.Entities.Ticket", b =>
                 {
                     b.Property<int>("Id")
@@ -474,7 +888,16 @@ namespace HelpDeskSystem.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsSlaPaused")
+                        .HasColumnType("bit");
+
                     b.Property<int>("PriorityId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SlaPausedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SlaPausedTotalMinutes")
                         .HasColumnType("int");
 
                     b.Property<int>("Status")
@@ -807,7 +1230,17 @@ namespace HelpDeskSystem.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsMfaEnabled")
+                        .HasColumnType("bit");
+
                     b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("MfaEnabledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MfaSecret")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -873,6 +1306,17 @@ namespace HelpDeskSystem.Persistence.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.BusinessHoursProfile", b =>
+                {
+                    b.HasOne("HelpDeskSystem.Domain.Entities.Tenant", "Tenant")
+                        .WithMany("BusinessHoursProfiles")
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("HelpDeskSystem.Domain.Entities.EscalationRule", b =>
                 {
                     b.HasOne("HelpDeskSystem.Domain.Entities.TicketPriority", "Priority")
@@ -882,6 +1326,58 @@ namespace HelpDeskSystem.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Priority");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.KnowledgeBaseArticle", b =>
+                {
+                    b.HasOne("HelpDeskSystem.Domain.Entities.KnowledgeBaseCategory", "Category")
+                        .WithMany("Articles")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HelpDeskSystem.Domain.Entities.Tenant", "Tenant")
+                        .WithMany("KnowledgeBaseArticles")
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.KnowledgeBaseArticleFeedback", b =>
+                {
+                    b.HasOne("HelpDeskSystem.Domain.Entities.KnowledgeBaseArticle", "Article")
+                        .WithMany("Feedback")
+                        .HasForeignKey("ArticleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Article");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.KnowledgeBaseArticleVersion", b =>
+                {
+                    b.HasOne("HelpDeskSystem.Domain.Entities.KnowledgeBaseArticle", "Article")
+                        .WithMany("Versions")
+                        .HasForeignKey("ArticleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Article");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.KnowledgeBaseCategory", b =>
+                {
+                    b.HasOne("HelpDeskSystem.Domain.Entities.Tenant", "Tenant")
+                        .WithMany("KnowledgeBaseCategories")
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("HelpDeskSystem.Domain.Entities.RefreshToken", b =>
@@ -932,6 +1428,28 @@ namespace HelpDeskSystem.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Ticket");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.TenantPortalSetting", b =>
+                {
+                    b.HasOne("HelpDeskSystem.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.TenantSecurityPolicy", b =>
+                {
+                    b.HasOne("HelpDeskSystem.Domain.Entities.Tenant", "Tenant")
+                        .WithMany("SecurityPolicies")
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("HelpDeskSystem.Domain.Entities.Ticket", b =>
@@ -1052,6 +1570,18 @@ namespace HelpDeskSystem.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.KnowledgeBaseArticle", b =>
+                {
+                    b.Navigation("Feedback");
+
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("HelpDeskSystem.Domain.Entities.KnowledgeBaseCategory", b =>
+                {
+                    b.Navigation("Articles");
+                });
+
             modelBuilder.Entity("HelpDeskSystem.Domain.Entities.Permission", b =>
                 {
                     b.Navigation("RolePermissions");
@@ -1066,7 +1596,15 @@ namespace HelpDeskSystem.Persistence.Migrations
 
             modelBuilder.Entity("HelpDeskSystem.Domain.Entities.Tenant", b =>
                 {
+                    b.Navigation("BusinessHoursProfiles");
+
+                    b.Navigation("KnowledgeBaseArticles");
+
+                    b.Navigation("KnowledgeBaseCategories");
+
                     b.Navigation("Roles");
+
+                    b.Navigation("SecurityPolicies");
 
                     b.Navigation("Tickets");
 

@@ -19,6 +19,7 @@ public class TicketDto
     public DateTime? UpdatedAtUtc { get; set; }
     public DateTime? ClosedAtUtc { get; set; }
     public DateTime? DueAtUtc { get; set; }
+    public bool IsSlaPaused { get; set; }
     public int TenantId { get; set; }
     public bool IsDeleted { get; set; }
 }

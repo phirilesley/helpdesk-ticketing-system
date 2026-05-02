@@ -42,9 +42,8 @@ public class CustomerController : ControllerBase
         if (!userId.HasValue || !tenantId.HasValue)
             return Unauthorized();
 
-        var tickets = await _ticketService.GetAllTicketsAsync();
-        var visible = tickets.Where(t => t.TenantId == tenantId.Value && t.CreatedByUserId == userId.Value);
-        return Ok(visible);
+        var tickets = await _ticketService.GetTicketsForCreatorAsync(tenantId.Value, userId.Value);
+        return Ok(tickets);
     }
 
     [HttpGet("tickets/{id}")]

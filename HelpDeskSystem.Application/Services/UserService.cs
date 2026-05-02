@@ -9,10 +9,12 @@ namespace HelpDeskSystem.Application.Services;
 public class UserService : IUserService
 {
     private readonly HelpDeskDbContext _context;
+    private readonly IMfaService _mfaService;
 
-    public UserService(HelpDeskDbContext context)
+    public UserService(HelpDeskDbContext context, IMfaService mfaService)
     {
         _context = context;
+        _mfaService = mfaService;
     }
 
     public async Task<UserDto?> GetUserByIdAsync(int id)
@@ -102,6 +104,55 @@ public class UserService : IUserService
         return user != null && BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
     }
 
+    public async Task<string> SetMfaSecretAsync(int userId)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && u.IsActive)
+                   ?? throw new InvalidOperationException("User not found.");
+
+        user.MfaSecret = _mfaService.GenerateSharedSecret();
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return user.MfaSecret;
+    }
+
+    public async Task<bool> EnableMfaAsync(int userId, string code)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+        if (user == null || string.IsNullOrWhiteSpace(user.MfaSecret))
+            return false;
+
+        if (!_mfaService.VerifyCode(user.MfaSecret, code))
+            return false;
+
+        user.IsMfaEnabled = true;
+        user.MfaEnabledAtUtc = DateTime.UtcNow;
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task DisableMfaAsync(int userId)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+        if (user == null)
+            return;
+
+        user.IsMfaEnabled = false;
+        user.MfaSecret = string.Empty;
+        user.MfaEnabledAtUtc = null;
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<bool> VerifyMfaCodeAsync(int userId, string code)
+    {
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+        if (user == null || !user.IsMfaEnabled || string.IsNullOrWhiteSpace(user.MfaSecret))
+            return false;
+
+        return _mfaService.VerifyCode(user.MfaSecret, code);
+    }
+
     private UserDto MapToDto(User user)
     {
         return new UserDto
@@ -112,6 +163,7 @@ public class UserService : IUserService
             FirstName = user.FirstName,
             LastName = user.LastName,
             IsActive = user.IsActive,
+            IsMfaEnabled = user.IsMfaEnabled,
             TenantId = user.TenantId,
             Roles = user.UserRoles.Select(ur => ur.Role?.Name ?? string.Empty).ToList()
         };

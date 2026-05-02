@@ -29,6 +29,8 @@ public static class SeedDataInitializer
         await EnsureTicketMetadataAsync(context, cancellationToken);
         await EnsureEscalationRulesAsync(context, cancellationToken);
         await EnsureAutomationRulesAsync(context, cancellationToken);
+        await EnsurePortalDefaultsAsync(context, tenant.Id, cancellationToken);
+        await EnsureTenantSecurityPolicyAsync(context, tenant.Id, cancellationToken);
     }
 
     private static async Task<Tenant> EnsureTenantAsync(HelpDeskDbContext context, SeedDataOptions options, CancellationToken cancellationToken)
@@ -214,5 +216,74 @@ public static class SeedDataInitializer
 
             await context.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private static async Task EnsurePortalDefaultsAsync(HelpDeskDbContext context, int tenantId, CancellationToken cancellationToken)
+    {
+        if (!await context.TenantPortalSettings.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.TenantPortalSettings.Add(new TenantPortalSetting
+            {
+                TenantId = tenantId,
+                BrandName = "Help Desk Portal",
+                PrimaryColor = "#1F6FEB",
+                WelcomeMessage = "How can we help you today?"
+            });
+        }
+
+        if (!await context.BusinessHoursProfiles.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.BusinessHoursProfiles.Add(new BusinessHoursProfile
+            {
+                TenantId = tenantId,
+                Name = "Default Business Hours",
+                TimeZoneId = "UTC",
+                WorkingDays = "1,2,3,4,5",
+                StartLocalTime = new TimeOnly(8, 0, 0),
+                EndLocalTime = new TimeOnly(17, 0, 0),
+                IsDefault = true,
+                IsActive = true
+            });
+        }
+
+        if (!await context.KnowledgeBaseCategories.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.KnowledgeBaseCategories.AddRange(
+                new KnowledgeBaseCategory
+                {
+                    TenantId = tenantId,
+                    Name = "Getting Started",
+                    Description = "Setup and onboarding guides",
+                    IsPublic = true,
+                    DisplayOrder = 10
+                },
+                new KnowledgeBaseCategory
+                {
+                    TenantId = tenantId,
+                    Name = "Troubleshooting",
+                    Description = "Common issues and fixes",
+                    IsPublic = true,
+                    DisplayOrder = 20
+                });
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task EnsureTenantSecurityPolicyAsync(HelpDeskDbContext context, int tenantId, CancellationToken cancellationToken)
+    {
+        if (await context.TenantSecurityPolicies.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+            return;
+
+        context.TenantSecurityPolicies.Add(new TenantSecurityPolicy
+        {
+            TenantId = tenantId,
+            RequireMfaForPrivilegedUsers = false,
+            AllowedIpRanges = string.Empty,
+            BlockInboundEmailTicketCreation = false,
+            ScimBearerTokenHash = string.Empty
+        });
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 }

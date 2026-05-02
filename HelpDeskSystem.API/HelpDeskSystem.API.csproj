@@ -17,6 +17,12 @@
     <ProjectReference Include="..\HelpDeskSystem.Application\HelpDeskSystem.Application.csproj" />
     <ProjectReference Include="..\HelpDeskSystem.Persistence\HelpDeskSystem.Persistence.csproj" />
     <ProjectReference Include="..\HelpDeskSystem.SLA\HelpDeskSystem.SLA.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.Files\HelpDeskSystem.Files.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.Workflow\HelpDeskSystem.Workflow.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.Notifications\HelpDeskSystem.Notifications.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.Realtime\HelpDeskSystem.Realtime.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.Reporting\HelpDeskSystem.Reporting.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.AI\HelpDeskSystem.AI.csproj" />
   </ItemGroup>
 
 </Project>

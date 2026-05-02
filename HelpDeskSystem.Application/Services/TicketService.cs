@@ -13,15 +13,21 @@ public class TicketService : ITicketService
     private readonly HelpDeskDbContext _context;
     private readonly INotificationService _notificationService;
     private readonly IAutomationRuleService _automationRuleService;
+    private readonly IBusinessTimeService _businessTimeService;
+    private readonly IAuditService _auditService;
 
     public TicketService(
         HelpDeskDbContext context,
         INotificationService notificationService,
-        IAutomationRuleService automationRuleService)
+        IAutomationRuleService automationRuleService,
+        IBusinessTimeService businessTimeService,
+        IAuditService auditService)
     {
         _context = context;
         _notificationService = notificationService;
         _automationRuleService = automationRuleService;
+        _businessTimeService = businessTimeService;
+        _auditService = auditService;
     }
 
     public async Task<TicketDto> CreateTicketAsync(CreateTicketDto dto)
@@ -52,6 +58,22 @@ public class TicketService : ITicketService
             DueAtUtc = dto.DueAtUtc
         };
 
+        if (!ticket.DueAtUtc.HasValue)
+        {
+            var slaRule = await _context.TicketSlaRules
+                .AsNoTracking()
+                .Where(r => r.CategoryId == ticket.CategoryId && r.PriorityId == ticket.PriorityId && r.IsActive && !r.IsDeleted)
+                .FirstOrDefaultAsync();
+
+            if (slaRule != null)
+            {
+                ticket.DueAtUtc = await _businessTimeService.AddBusinessMinutesAsync(
+                    ticket.TenantId,
+                    DateTime.UtcNow,
+                    slaRule.ResolutionTimeMinutes);
+            }
+        }
+
         _context.Tickets.Add(ticket);
         await _context.SaveChangesAsync();
 
@@ -65,6 +87,13 @@ public class TicketService : ITicketService
             ticket.Id,
             AutomationTriggerType.TicketCreated,
             ticket.CreatedByUserId);
+
+        await _auditService.LogAsync(
+            ticket.CreatedByUserId,
+            "PORTAL_TICKET_CREATED",
+            "Ticket",
+            ticket.Id.ToString(),
+            newValues: $"{{\"ticketNumber\":\"{ticket.TicketNumber}\",\"tenantId\":{ticket.TenantId}}}");
 
         return await MapToDtoAsync(ticket);
     }
@@ -85,6 +114,23 @@ public class TicketService : ITicketService
             .Where(t => !t.IsDeleted)
             .Include(t => t.Category)
             .Include(t => t.Priority)
+            .ToListAsync();
+
+        var dtos = new List<TicketDto>();
+        foreach (var ticket in tickets)
+        {
+            dtos.Add(await MapToDtoAsync(ticket));
+        }
+        return dtos;
+    }
+
+    public async Task<IEnumerable<TicketDto>> GetTicketsForCreatorAsync(int tenantId, int creatorUserId)
+    {
+        var tickets = await _context.Tickets
+            .Where(t => !t.IsDeleted && t.TenantId == tenantId && t.CreatedByUserId == creatorUserId)
+            .Include(t => t.Category)
+            .Include(t => t.Priority)
+            .OrderByDescending(t => t.CreatedAtUtc)
             .ToListAsync();
 
         var dtos = new List<TicketDto>();
@@ -202,6 +248,46 @@ public class TicketService : ITicketService
             userId);
     }
 
+    public async Task PauseSlaAsync(int ticketId, int userId, string reason)
+    {
+        var ticket = await _context.Tickets.FirstOrDefaultAsync(t => t.Id == ticketId && !t.IsDeleted);
+        if (ticket == null || ticket.IsSlaPaused)
+            return;
+
+        ticket.IsSlaPaused = true;
+        ticket.SlaPausedAtUtc = DateTime.UtcNow;
+        ticket.UpdatedAtUtc = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        await _auditService.LogAsync(
+            userId,
+            "SLA_PAUSED",
+            "Ticket",
+            ticketId.ToString(),
+            newValues: $"{{\"reason\":\"{reason}\"}}");
+    }
+
+    public async Task ResumeSlaAsync(int ticketId, int userId, string reason)
+    {
+        var ticket = await _context.Tickets.FirstOrDefaultAsync(t => t.Id == ticketId && !t.IsDeleted);
+        if (ticket == null || !ticket.IsSlaPaused || !ticket.SlaPausedAtUtc.HasValue)
+            return;
+
+        var pausedMinutes = (int)Math.Max(0, Math.Floor((DateTime.UtcNow - ticket.SlaPausedAtUtc.Value).TotalMinutes));
+        ticket.SlaPausedTotalMinutes += pausedMinutes;
+        ticket.IsSlaPaused = false;
+        ticket.SlaPausedAtUtc = null;
+        ticket.UpdatedAtUtc = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        await _auditService.LogAsync(
+            userId,
+            "SLA_RESUMED",
+            "Ticket",
+            ticketId.ToString(),
+            newValues: $"{{\"reason\":\"{reason}\",\"pausedMinutes\":{pausedMinutes}}}");
+    }
+
     private async Task<TicketDto> MapToDtoAsync(Ticket ticket)
     {
         return new TicketDto
@@ -221,6 +307,7 @@ public class TicketService : ITicketService
             UpdatedAtUtc = ticket.UpdatedAtUtc,
             ClosedAtUtc = ticket.ClosedAtUtc,
             DueAtUtc = ticket.DueAtUtc,
+            IsSlaPaused = ticket.IsSlaPaused,
             TenantId = ticket.TenantId,
             IsDeleted = ticket.IsDeleted
         };

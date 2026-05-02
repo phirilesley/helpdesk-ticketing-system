@@ -1,4 +1,5 @@
 using System.Text;
+using HelpDeskSystem.API.Jobs;
 using HelpDeskSystem.API.Security;
 using HelpDeskSystem.API.Services;
 using HelpDeskSystem.API.Setup;
@@ -80,18 +81,31 @@ builder.Services.AddHttpClient();
 var notificationChannels = builder.Configuration.GetSection(NotificationChannelOptions.SectionName).Get<NotificationChannelOptions>()
     ?? new NotificationChannelOptions();
 builder.Services.AddSingleton(notificationChannels);
+var auditRetentionOptions = builder.Configuration.GetSection(AuditRetentionOptions.SectionName).Get<AuditRetentionOptions>()
+    ?? new AuditRetentionOptions();
+builder.Services.AddSingleton(auditRetentionOptions);
+var inboundEmailOptions = builder.Configuration.GetSection(InboundEmailOptions.SectionName).Get<InboundEmailOptions>()
+    ?? new InboundEmailOptions();
+builder.Services.AddSingleton(inboundEmailOptions);
 
 // Add application services
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddScoped<ITicketMessageService, TicketMessageService>();
+builder.Services.AddScoped<IMfaService, MfaService>();
+builder.Services.AddScoped<ITenantSecurityPolicyService, TenantSecurityPolicyService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IAutomationRuleService, AutomationRuleService>();
 builder.Services.AddScoped<ISlaService, SlaService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IAuditRetentionService, AuditRetentionService>();
+builder.Services.AddScoped<IBusinessTimeService, BusinessTimeService>();
+builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
+builder.Services.AddScoped<IEmailIngestionService, EmailIngestionService>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<CheckSlaBreachesJob>();
+builder.Services.AddScoped<PurgeAuditLogsJob>();
 
 builder.Services.AddHangfire(config =>
 {
@@ -120,6 +134,7 @@ if (app.Environment.IsDevelopment())
 await SeedDataInitializer.InitializeAsync(app.Services, app.Configuration);
 
 var slaJobOptions = app.Configuration.GetSection(SlaJobOptions.SectionName).Get<SlaJobOptions>() ?? new SlaJobOptions();
+var auditRetentionJobOptions = app.Configuration.GetSection(AuditRetentionOptions.SectionName).Get<AuditRetentionOptions>() ?? new AuditRetentionOptions();
 if (slaJobOptions.Enabled)
 {
     var recurringJobs = app.Services.GetRequiredService<IRecurringJobManager>();
@@ -127,6 +142,15 @@ if (slaJobOptions.Enabled)
         "sla-breach-check",
         job => job.ExecuteAsync(),
         slaJobOptions.Cron);
+}
+
+if (auditRetentionJobOptions.Enabled)
+{
+    var recurringJobs = app.Services.GetRequiredService<IRecurringJobManager>();
+    recurringJobs.AddOrUpdate<PurgeAuditLogsJob>(
+        "audit-retention-purge",
+        job => job.ExecuteAsync(CancellationToken.None),
+        auditRetentionJobOptions.Cron);
 }
 
 app.UseHttpsRedirection();

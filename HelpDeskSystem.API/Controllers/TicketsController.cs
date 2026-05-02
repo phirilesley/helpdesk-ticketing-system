@@ -151,6 +151,44 @@ public class TicketsController : ControllerBase
         return Ok(grouped);
     }
 
+    [HttpPost("{id}/sla/pause")]
+    [Authorize(Roles = "Agent,Admin,SuperAdmin")]
+    public async Task<IActionResult> PauseSla(int id, [FromBody] SlaPauseResumeRequest request)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized();
+
+        var ticket = await _ticketService.GetTicketByIdAsync(id);
+        if (ticket == null)
+            return NotFound();
+
+        if (!CanAccessTicket(ticket))
+            return Forbid();
+
+        await _ticketService.PauseSlaAsync(id, userId.Value, request.Reason);
+        return NoContent();
+    }
+
+    [HttpPost("{id}/sla/resume")]
+    [Authorize(Roles = "Agent,Admin,SuperAdmin")]
+    public async Task<IActionResult> ResumeSla(int id, [FromBody] SlaPauseResumeRequest request)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized();
+
+        var ticket = await _ticketService.GetTicketByIdAsync(id);
+        if (ticket == null)
+            return NotFound();
+
+        if (!CanAccessTicket(ticket))
+            return Forbid();
+
+        await _ticketService.ResumeSlaAsync(id, userId.Value, request.Reason);
+        return NoContent();
+    }
+
     [HttpPost("{id}/messages")]
     public async Task<ActionResult<TicketMessageDto>> SendMessage(int id, CreateTicketMessageDto dto)
     {
@@ -210,4 +248,9 @@ public class ChangeStatusRequest
 {
     public TicketStatus Status { get; set; }
     public string Comment { get; set; } = string.Empty;
+}
+
+public class SlaPauseResumeRequest
+{
+    public string Reason { get; set; } = string.Empty;
 }

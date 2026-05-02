@@ -15,15 +15,18 @@ public class UsersController : ControllerBase
     private readonly IUserService _userService;
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenService _refreshTokenService;
+    private readonly ITenantSecurityPolicyService _tenantSecurityPolicyService;
 
     public UsersController(
         IUserService userService,
         ITokenService tokenService,
-        IRefreshTokenService refreshTokenService)
+        IRefreshTokenService refreshTokenService,
+        ITenantSecurityPolicyService tenantSecurityPolicyService)
     {
         _userService = userService;
         _tokenService = tokenService;
         _refreshTokenService = refreshTokenService;
+        _tenantSecurityPolicyService = tenantSecurityPolicyService;
     }
 
     [HttpPost]
@@ -97,6 +100,34 @@ public class UsersController : ControllerBase
         var user = await _userService.GetUserByEmailAsync(dto.Email);
         if (user == null)
             return Unauthorized();
+
+        if (user.TenantId.HasValue)
+        {
+            var ipAllowed = await _tenantSecurityPolicyService.IsIpAllowedAsync(
+                user.TenantId.Value,
+                GetIpAddress(),
+                HttpContext.RequestAborted);
+            if (!ipAllowed)
+                return Unauthorized("IP address not allowed by tenant policy.");
+
+            var requiresMfa = await _tenantSecurityPolicyService.RequiresMfaForUserAsync(
+                user.TenantId.Value,
+                user.Roles,
+                HttpContext.RequestAborted);
+
+            if (requiresMfa)
+            {
+                if (!user.IsMfaEnabled)
+                    return Unauthorized("MFA enrollment required.");
+
+                if (string.IsNullOrWhiteSpace(dto.MfaCode))
+                    return Unauthorized("MFA code is required.");
+
+                var validMfa = await _userService.VerifyMfaCodeAsync(user.Id, dto.MfaCode);
+                if (!validMfa)
+                    return Unauthorized("Invalid MFA code.");
+            }
+        }
 
         var accessToken = _tokenService.Generate(user);
         var (refreshToken, refreshExpiresAtUtc) = await _refreshTokenService.CreateAsync(
@@ -208,6 +239,57 @@ public class UsersController : ControllerBase
             return Unauthorized();
 
         await _refreshTokenService.RevokeAllSessionsAsync(userId.Value, HttpContext.RequestAborted);
+        return NoContent();
+    }
+
+    [HttpPost("mfa/enroll")]
+    [Authorize]
+    public async Task<ActionResult<MfaEnrollmentDto>> EnrollMfa()
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized();
+
+        var user = await _userService.GetUserByIdAsync(userId.Value);
+        if (user == null)
+            return Unauthorized();
+
+        var sharedSecret = await _userService.SetMfaSecretAsync(userId.Value);
+        var issuer = Uri.EscapeDataString("HelpDeskSystem");
+        var account = Uri.EscapeDataString(user.Email);
+        var uri = $"otpauth://totp/{issuer}:{account}?secret={sharedSecret}&issuer={issuer}&algorithm=SHA1&digits=6&period=30";
+
+        return Ok(new MfaEnrollmentDto
+        {
+            SharedSecret = sharedSecret,
+            OtpauthUri = uri
+        });
+    }
+
+    [HttpPost("mfa/verify")]
+    [Authorize]
+    public async Task<IActionResult> VerifyMfa([FromBody] MfaVerifyRequestDto dto)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized();
+
+        var enabled = await _userService.EnableMfaAsync(userId.Value, dto.Code);
+        if (!enabled)
+            return BadRequest("Invalid MFA code.");
+
+        return NoContent();
+    }
+
+    [HttpPost("mfa/disable")]
+    [Authorize]
+    public async Task<IActionResult> DisableMfa()
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized();
+
+        await _userService.DisableMfaAsync(userId.Value);
         return NoContent();
     }
 

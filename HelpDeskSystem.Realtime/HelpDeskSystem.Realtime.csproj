@@ -6,4 +6,13 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HelpDeskSystem.Domain\HelpDeskSystem.Domain.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.Application\HelpDeskSystem.Application.csproj" />
+  </ItemGroup>
+
 </Project>
