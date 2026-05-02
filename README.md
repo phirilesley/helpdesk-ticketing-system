@@ -1,108 +1,53 @@
-# 🧑‍💻 Help Desk + Real-Time Ticketing System
+# Help Desk System
 
-## 📌 Overview
+A comprehensive enterprise help desk system built with ASP.NET Core and React.
 
-An enterprise-grade help desk system with real-time chat, workflow automation, and SLA tracking.
+## Features
 
----
+- ✅ Ticket Management (CRUD)
+- ✅ Kanban Board
+- 🔄 Real-time Chat (SignalR - ready for implementation)
+- 🔄 Workflow Management
+- 🔄 SLA Tracking
+- 🔄 Reporting
 
-## 🎯 Purpose
+## Architecture
 
-To demonstrate the ability to build:
+- **HelpDeskSystem.API**: Web API with controllers
+- **HelpDeskSystem.Application**: Business logic and services
+- **HelpDeskSystem.Domain**: Core entities and business rules
+- **HelpDeskSystem.Persistence**: EF Core database layer
+- **HelpDeskSystem.Shared**: Common utilities
+- **HelpDeskSystem.Web**: React frontend (to be implemented)
 
-* Real-time applications
-* Workflow-driven systems
-* Enterprise ticket management platforms
+## Getting Started
 
----
+1. Clone the repository
+2. Run `dotnet build` in the root
+3. Run `dotnet run --project HelpDeskSystem.API`
+4. API available at http://localhost:5229/swagger
 
-## 🚀 Features
+## Database
 
-* Ticket Creation & Management
-* Ticket Assignment
-* Priority Levels
-* Status Tracking
-* Kanban Board Workflow
-* Real-Time Chat (SignalR)
-* File Attachments
-* Internal Notes
-* SLA Tracking
-* Notifications
-* Audit Logs
-* Reports & Analytics
+Uses SQL Server LocalDB. Migrations are included.
 
----
+## MVP Scope - ✅ COMPLETED
 
-## 🧠 Workflow
+- ✅ Ticket creation, list, details
+- ✅ Assignment and status changes
+- ✅ Kanban board
+- ✅ Basic messaging
+- ✅ Audit trail (status history)
 
-Ticket Lifecycle:
+## API Endpoints
 
-New → In Progress → Waiting → Resolved → Closed
-
----
-
-## 🏗️ System Components
-
-* Ticket Management Service
-* Assignment Engine
-* Real-Time Messaging (SignalR)
-* SLA Monitoring Engine
-* Notification System
-* Reporting Module
-
----
-
-## 🛠️ Tech Stack
-
-* ASP.NET Core Web API
-* Entity Framework Core
-* SQL Server
-* SignalR
-* Hangfire
-* React + TypeScript
-* Tailwind CSS
-
----
-
-## 📂 Architecture
-
-* Clean Architecture
-* Modular Monolith
-
----
-
-## 📌 Key Models
-
-* Ticket
-* TicketMessage
-* TicketAssignment
-* TicketAttachment
-* TicketStatusHistory
-* TicketSlaRule
-* Notification
-* AuditLog
-
----
-
-## 🔥 Why This Project Matters
-
-This project demonstrates:
-
-* Real-time communication systems
-* Enterprise workflow design
-* Scalable backend architecture
-
----
-
-## 🚀 Future Enhancements
-
-* Escalation Rules
-* Automated SLA Alerts
-* Customer Portal
-* Analytics Dashboard
-
----
-
-## 👨‍💻 Author
-
-Built as a real-time enterprise workflow system.
+- `POST /api/tickets` - Create ticket
+- `GET /api/tickets` - List tickets
+- `GET /api/tickets/{id}` - Get ticket details
+- `PUT /api/tickets/{id}` - Update ticket
+- `DELETE /api/tickets/{id}` - Delete ticket
+- `POST /api/tickets/{id}/assign` - Assign ticket
+- `POST /api/tickets/{id}/status` - Change status
+- `GET /api/tickets/kanban` - Kanban view
+- `POST /api/tickets/{id}/messages` - Send message
+- `GET /api/tickets/{id}/messages` - Get messages
