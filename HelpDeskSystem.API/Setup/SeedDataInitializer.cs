@@ -31,6 +31,7 @@ public static class SeedDataInitializer
         await EnsureAutomationRulesAsync(context, cancellationToken);
         await EnsurePortalDefaultsAsync(context, tenant.Id, cancellationToken);
         await EnsureTenantSecurityPolicyAsync(context, tenant.Id, cancellationToken);
+        await EnsureEnterpriseDefaultsAsync(context, tenant.Id, cancellationToken);
     }
 
     private static async Task<Tenant> EnsureTenantAsync(HelpDeskDbContext context, SeedDataOptions options, CancellationToken cancellationToken)
@@ -283,6 +284,239 @@ public static class SeedDataInitializer
             BlockInboundEmailTicketCreation = false,
             ScimBearerTokenHash = string.Empty
         });
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task EnsureEnterpriseDefaultsAsync(HelpDeskDbContext context, int tenantId, CancellationToken cancellationToken)
+    {
+        if (!await context.IdentityProviderConfigs.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.IdentityProviderConfigs.Add(new IdentityProviderConfig
+            {
+                TenantId = tenantId,
+                Name = "Default OIDC",
+                Protocol = IdentityProtocol.Oidc,
+                Issuer = "https://accounts.google.com",
+                AuthorityOrMetadataUrl = "https://accounts.google.com",
+                ClientId = "replace-me",
+                ClientSecret = "replace-me",
+                Audience = string.Empty,
+                EnforceSso = false,
+                EnforceStrictIssuer = true,
+                AllowedRedirectUrisJson = "[\"https://localhost:3000/auth/callback\"]",
+                OidcRequirePkce = true,
+                IsEnabled = false
+            });
+        }
+
+        if (!await context.AbacPolicyRules.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.AbacPolicyRules.Add(new AbacPolicyRule
+            {
+                TenantId = tenantId,
+                Name = "Default Ticket Access",
+                Resource = "ticket",
+                Action = "read_write",
+                ConditionJson = "{\"roles\":[\"Admin\",\"Agent\"]}",
+                Effect = PolicyEffect.Allow,
+                Priority = 100,
+                IsEnabled = true
+            });
+        }
+
+        if (!await context.OmnichannelConnectors.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.OmnichannelConnectors.Add(new OmnichannelConnector
+            {
+                TenantId = tenantId,
+                ChannelType = ChannelType.WebForm,
+                Name = "Default Web Form",
+                ProviderKey = "portal",
+                ConfigJson = "{\"source\":\"portal\"}",
+                InboundSigningSecretHash = string.Empty,
+                SignatureHeaderName = "X-Channel-Signature",
+                SignatureAlgorithm = "hmac-sha256",
+                DedupWindowMinutes = 120,
+                Status = ConnectorStatus.Enabled
+            });
+        }
+
+        if (!await context.WorkflowDefinitions.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.WorkflowDefinitions.Add(new WorkflowDefinition
+            {
+                TenantId = tenantId,
+                Name = "Default Escalation Workflow",
+                Version = 1,
+                IsPublished = true,
+                GraphJson = "{\"nodes\":[{\"id\":\"start\",\"type\":\"start\"},{\"id\":\"branch-1\",\"type\":\"branch\"},{\"id\":\"guard-1\",\"type\":\"guard\"},{\"id\":\"delay-1\",\"type\":\"delay\",\"delayMinutes\":60}],\"edges\":[{\"from\":\"start\",\"to\":\"branch-1\",\"condition\":\"always\",\"isDefault\":true},{\"from\":\"branch-1\",\"to\":\"guard-1\",\"condition\":\"priority=high\",\"isDefault\":false},{\"from\":\"branch-1\",\"to\":\"delay-1\",\"condition\":\"default\",\"isDefault\":true}]}",
+                GuardrailJson = "{\"maxExecutionMinutes\":240,\"maxLoopCount\":3,\"requiresGuard\":true}",
+                MaxLoopCount = 3
+            });
+        }
+
+        if (!await context.IntegrationApps.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.IntegrationApps.Add(new IntegrationApp
+            {
+                TenantId = tenantId,
+                Name = "Slack Integration (Disabled)",
+                Provider = "slack",
+                ConfigJson = "{\"webhookUrl\":\"\"}",
+                IsEnabled = false
+            });
+        }
+
+        if (!await context.WebhookSubscriptions.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.WebhookSubscriptions.Add(new WebhookSubscription
+            {
+                TenantId = tenantId,
+                Name = "Audit Webhook",
+                EndpointUrl = "https://example.com/webhooks/helpdesk",
+                SecretHash = string.Empty,
+                EventFiltersJson = "[\"ticket.created\",\"ticket.updated\",\"ticket.closed\"]",
+                MaxAttempts = 5,
+                RetryBackoffSeconds = 30,
+                TimeoutSeconds = 20,
+                IsEnabled = false
+            });
+        }
+
+        if (!await context.MarketplaceApps.AnyAsync(x => !x.IsDeleted, cancellationToken))
+        {
+            context.MarketplaceApps.AddRange(
+                new MarketplaceApp
+                {
+                    AppKey = "slack.notifications",
+                    Name = "Slack Notifications",
+                    Category = "communication",
+                    Provider = "slack",
+                    ManifestJson = "{\"events\":[\"ticket.created\",\"ticket.updated\"],\"requires\":[\"webhookUrl\"]}",
+                    MinPlanName = "Professional",
+                    IsPublic = true,
+                    IsActive = true
+                },
+                new MarketplaceApp
+                {
+                    AppKey = "teams.notifications",
+                    Name = "Microsoft Teams Notifications",
+                    Category = "communication",
+                    Provider = "teams",
+                    ManifestJson = "{\"events\":[\"ticket.escalated\"],\"requires\":[\"webhookUrl\"]}",
+                    MinPlanName = "Professional",
+                    IsPublic = true,
+                    IsActive = true
+                });
+        }
+
+        if (!await context.BillingPlans.AnyAsync(x => !x.IsDeleted, cancellationToken))
+        {
+            context.BillingPlans.AddRange(
+                new BillingPlan
+                {
+                    Name = "Starter",
+                    MonthlyPriceUsd = 49,
+                    IncludedAgentSeats = 5,
+                    IncludedTicketsPerMonth = 1000,
+                    EntitlementsJson = "{\"channels\":[\"web\"],\"automation\":false}",
+                    IsActive = true
+                },
+                new BillingPlan
+                {
+                    Name = "Professional",
+                    MonthlyPriceUsd = 149,
+                    IncludedAgentSeats = 25,
+                    IncludedTicketsPerMonth = 10000,
+                    EntitlementsJson = "{\"channels\":[\"web\",\"email\",\"chat\"],\"automation\":true}",
+                    IsActive = true
+                },
+                new BillingPlan
+                {
+                    Name = "Enterprise",
+                    MonthlyPriceUsd = 499,
+                    IncludedAgentSeats = 250,
+                    IncludedTicketsPerMonth = 250000,
+                    EntitlementsJson = "{\"channels\":[\"web\",\"email\",\"chat\",\"voice\"],\"automation\":true,\"sso\":true,\"scim\":true}",
+                    IsActive = true
+                });
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        if (!await context.TenantSubscriptions.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            var starter = await context.BillingPlans
+                .Where(x => x.Name == "Starter" && x.IsActive && !x.IsDeleted)
+                .OrderBy(x => x.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (starter != null)
+            {
+                context.TenantSubscriptions.Add(new TenantSubscription
+                {
+                    TenantId = tenantId,
+                    BillingPlanId = starter.Id,
+                    Status = SubscriptionStatus.Trial,
+                    CurrentPeriodStartUtc = DateTime.UtcNow.Date,
+                    CurrentPeriodEndUtc = DateTime.UtcNow.Date.AddDays(14),
+                    AutoRenew = false,
+                    EntitlementOverridesJson = "{}"
+                });
+            }
+        }
+
+        if (!await context.ServiceProjects.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.ServiceProjects.Add(new ServiceProject
+            {
+                TenantId = tenantId,
+                Key = "IT",
+                Name = "IT Service",
+                WorkflowConfigJson = "{\"workflow\":\"default\"}"
+            });
+        }
+
+        if (!await context.SlaPauseRules.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.SlaPauseRules.Add(new SlaPauseRule
+            {
+                TenantId = tenantId,
+                Name = "Pause while waiting for customer",
+                ConditionJson = "{\"status\":\"WaitingForCustomer\"}",
+                PauseResponseSla = false,
+                PauseResolutionSla = true,
+                IsEnabled = true
+            });
+        }
+
+        if (!await context.SlaBreachActions.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.SlaBreachActions.AddRange(
+                new SlaBreachAction
+                {
+                    TenantId = tenantId,
+                    Name = "Notify admins on resolution breach",
+                    BreachType = "resolution",
+                    TriggerAfterBreachMinutes = 0,
+                    ExecutionOrder = 10,
+                    ActionType = "notify_role",
+                    ActionConfigJson = "{\"role\":\"Admin\"}",
+                    IsEnabled = true
+                },
+                new SlaBreachAction
+                {
+                    TenantId = tenantId,
+                    Name = "Escalate status on prolonged breach",
+                    BreachType = "resolution",
+                    TriggerAfterBreachMinutes = 60,
+                    ExecutionOrder = 20,
+                    ActionType = "set_status",
+                    ActionConfigJson = "{\"status\":\"Escalated\"}",
+                    IsEnabled = true
+                });
+        }
 
         await context.SaveChangesAsync(cancellationToken);
     }

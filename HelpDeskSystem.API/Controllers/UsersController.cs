@@ -3,6 +3,8 @@ using HelpDeskSystem.API.Services;
 using HelpDeskSystem.Application.DTOs.Auth;
 using HelpDeskSystem.Application.DTOs.Users;
 using HelpDeskSystem.Application.Interfaces;
+using HelpDeskSystem.Persistence.Context;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,17 +18,20 @@ public class UsersController : ControllerBase
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly ITenantSecurityPolicyService _tenantSecurityPolicyService;
+    private readonly HelpDeskDbContext _context;
 
     public UsersController(
         IUserService userService,
         ITokenService tokenService,
         IRefreshTokenService refreshTokenService,
-        ITenantSecurityPolicyService tenantSecurityPolicyService)
+        ITenantSecurityPolicyService tenantSecurityPolicyService,
+        HelpDeskDbContext context)
     {
         _userService = userService;
         _tokenService = tokenService;
         _refreshTokenService = refreshTokenService;
         _tenantSecurityPolicyService = tenantSecurityPolicyService;
+        _context = context;
     }
 
     [HttpPost]
@@ -45,6 +50,21 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound();
         return user;
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<ActionResult<UserDto>> GetCurrentUser()
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized();
+
+        var user = await _userService.GetUserByIdAsync(userId.Value);
+        if (user == null)
+            return NotFound();
+
+        return Ok(user);
     }
 
     [HttpGet("email/{email}")]
@@ -100,6 +120,15 @@ public class UsersController : ControllerBase
         var user = await _userService.GetUserByEmailAsync(dto.Email);
         if (user == null)
             return Unauthorized();
+
+        if (user.TenantId.HasValue)
+        {
+            var ssoEnforced = await _context.IdentityProviderConfigs
+                .AsNoTracking()
+                .AnyAsync(x => x.TenantId == user.TenantId.Value && x.IsEnabled && x.EnforceSso && !x.IsDeleted, HttpContext.RequestAborted);
+            if (ssoEnforced)
+                return Unauthorized("Tenant enforces SSO. Use external identity provider login.");
+        }
 
         if (user.TenantId.HasValue)
         {

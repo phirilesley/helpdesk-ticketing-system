@@ -21,20 +21,21 @@ import {
   Menu as MenuIcon,
   Dashboard,
   Assessment,
-  SupportTicket,
+  ConfirmationNumber,
   Add,
   Person,
   Settings,
   Book,
   AccountCircle,
-  Logout
+  Logout,
+  AdminPanelSettings
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const drawerWidth = 240;
 
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const Layout: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
@@ -61,7 +62,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const menuItems = [
     { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
     { text: 'Analytics', icon: <Assessment />, path: '/admin' },
-    { text: 'My Tickets', icon: <SupportTicket />, path: '/tickets' },
+    { text: 'Enterprise', icon: <AdminPanelSettings />, path: '/enterprise', adminOnly: true },
+    { text: 'My Tickets', icon: <ConfirmationNumber />, path: '/tickets' },
     { text: 'Create Ticket', icon: <Add />, path: '/tickets/create' },
     { text: 'Knowledge Base', icon: <Book />, path: '/knowledge-base' },
     { text: 'Profile', icon: <Person />, path: '/profile' },
@@ -77,7 +79,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </Toolbar>
       <Divider />
       <List>
-        {menuItems.map((item) => (
+        {menuItems.filter(item => !item.adminOnly || (user?.roles?.includes('Admin') || user?.roles?.includes('SuperAdmin'))).map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
               selected={location.pathname === item.path}
@@ -196,7 +198,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         }}
       >
         <Toolbar />
-        {children}
+        <Outlet />
       </Box>
     </Box>
   );

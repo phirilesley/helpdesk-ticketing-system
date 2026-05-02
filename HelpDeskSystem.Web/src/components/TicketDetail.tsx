@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Card,
@@ -8,7 +8,6 @@ import {
   Button,
   Grid,
   TextField,
-  Paper,
   Avatar,
   Divider,
   CircularProgress,
@@ -20,94 +19,64 @@ import {
 } from '@mui/material';
 import { format } from 'date-fns';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-
-interface Ticket {
-  id: number;
-  ticketNumber: string;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  category: string;
-  createdAt: string;
-  updatedAt: string;
-  assignedTo?: {
-    id: number;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-  createdBy: {
-    id: number;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-  attachments: Array<{
-    id: number;
-    fileName: string;
-    fileSize: number;
-    contentType: string;
-    downloadUrl: string;
-  }>;
-  comments: Array<{
-    id: number;
-    content: string;
-    createdAt: string;
-    author: {
-      firstName: string;
-      lastName: string;
-    };
-    isInternal: boolean;
-  }>;
-}
+import { addComment, getTicket, getTicketComments, Ticket, TicketComment } from '../services/api';
 
 const TicketDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [comments, setComments] = useState<TicketComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      fetchTicket(parseInt(id));
+    if (!id) {
+      return;
     }
+
+    const ticketId = parseInt(id, 10);
+    if (Number.isNaN(ticketId)) {
+      setError('Invalid ticket id');
+      setLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [ticketResult, commentsResult] = await Promise.all([
+          getTicket(ticketId),
+          getTicketComments(ticketId)
+        ]);
+        setTicket(ticketResult);
+        setComments(commentsResult);
+      } catch {
+        setError('Failed to fetch ticket details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [id]);
 
-  const fetchTicket = async (ticketId: number) => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`/api/tickets/${ticketId}`);
-      setTicket(response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch ticket details');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAddComment = async () => {
-    if (!newComment.trim() || !ticket) return;
+    if (!newComment.trim() || !ticket) {
+      return;
+    }
 
     try {
       setSubmittingComment(true);
-      const response = await axios.post(`/api/tickets/${ticket.id}/comments`, {
+      const created = await addComment(ticket.id, {
         content: newComment,
         isInternal: false
       });
-      
-      setTicket(prev => prev ? {
-        ...prev,
-        comments: [...prev.comments, response.data]
-      } : null);
-      
+      setComments((prev) => [...prev, created]);
       setNewComment('');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to add comment');
+    } catch {
+      setError('Failed to add comment');
     } finally {
       setSubmittingComment(false);
     }
@@ -115,10 +84,12 @@ const TicketDetail: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'open': return 'error';
-      case 'in_progress': return 'warning';
+      case 'new': return 'info';
+      case 'inprogress': return 'warning';
+      case 'waiting': return 'secondary';
       case 'resolved': return 'success';
       case 'closed': return 'default';
+      case 'escalated': return 'error';
       default: return 'default';
     }
   };
@@ -170,7 +141,7 @@ const TicketDetail: React.FC = () => {
               <Typography variant="h6" gutterBottom>
                 {ticket.title}
               </Typography>
-              
+
               <Box display="flex" gap={1} mb={2}>
                 <Chip
                   label={ticket.status}
@@ -216,29 +187,29 @@ const TicketDetail: React.FC = () => {
               </Box>
 
               <List>
-                {ticket.comments.map((comment) => (
+                {comments.map((comment) => (
                   <ListItem key={comment.id} alignItems="flex-start">
                     <ListItemAvatar>
                       <Avatar>
-                        {comment.author.firstName[0]}{comment.author.lastName[0]}
+                        U{comment.senderUserId}
                       </Avatar>
                     </ListItemAvatar>
                     <ListItemText
-                      primary={
+                      primary={(
                         <Box display="flex" justifyContent="space-between" alignItems="center">
                           <Typography variant="subtitle2">
-                            {comment.author.firstName} {comment.author.lastName}
+                            User {comment.senderUserId}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             {format(new Date(comment.createdAt), 'MMM dd, yyyy HH:mm')}
                           </Typography>
                         </Box>
-                      }
-                      secondary={
+                      )}
+                      secondary={(
                         <Typography variant="body2" sx={{ mt: 1 }}>
                           {comment.content}
                         </Typography>
-                      }
+                      )}
                     />
                   </ListItem>
                 ))}
@@ -248,12 +219,12 @@ const TicketDetail: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} md={4}>
-          <Card sx={{ mb: 3 }}>
+          <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
                 Ticket Details
               </Typography>
-              
+
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Box>
                   <Typography variant="caption" color="text.secondary">
@@ -263,7 +234,7 @@ const TicketDetail: React.FC = () => {
                     {format(new Date(ticket.createdAt), 'MMM dd, yyyy HH:mm')}
                   </Typography>
                 </Box>
-                
+
                 <Box>
                   <Typography variant="caption" color="text.secondary">
                     Last Updated
@@ -277,54 +248,24 @@ const TicketDetail: React.FC = () => {
 
                 <Box>
                   <Typography variant="caption" color="text.secondary">
-                    Created By
+                    Created By User ID
                   </Typography>
                   <Typography variant="body2">
-                    {ticket.createdBy.firstName} {ticket.createdBy.lastName}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {ticket.createdBy.email}
+                    {ticket.createdByUserId ?? 'Unknown'}
                   </Typography>
                 </Box>
 
-                {ticket.assignedTo && (
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Assigned To
-                    </Typography>
-                    <Typography variant="body2">
-                      {ticket.assignedTo.firstName} {ticket.assignedTo.lastName}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {ticket.assignedTo.email}
-                    </Typography>
-                  </Box>
-                )}
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Assigned To User ID
+                  </Typography>
+                  <Typography variant="body2">
+                    {ticket.assignedToUserId ?? 'Unassigned'}
+                  </Typography>
+                </Box>
               </Box>
             </CardContent>
           </Card>
-
-          {ticket.attachments.length > 0 && (
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Attachments
-                </Typography>
-                {ticket.attachments.map((attachment) => (
-                  <Button
-                    key={attachment.id}
-                    variant="outlined"
-                    size="small"
-                    href={attachment.downloadUrl}
-                    download={attachment.fileName}
-                    sx={{ mr: 1, mb: 1 }}
-                  >
-                    {attachment.fileName}
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
-          )}
         </Grid>
       </Grid>
     </Box>

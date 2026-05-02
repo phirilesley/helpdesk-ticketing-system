@@ -67,8 +67,20 @@ public class WorkflowController : ControllerBase
         if (!tenantId.HasValue)
             return Forbid();
 
-        // This would need to be implemented in the service
-        // For now, return success
+        var existing = (await _workflowEngine.GetActiveRulesAsync(tenantId.Value))
+            .FirstOrDefault(x => x.Id == id);
+        if (existing == null)
+            return NotFound();
+
+        existing.Name = dto.Name;
+        existing.Description = dto.Description;
+        existing.IsActive = dto.IsActive;
+        existing.Priority = dto.Priority;
+        existing.TriggerConditionJson = dto.TriggerConditionJson;
+        existing.ActionsJson = dto.ActionsJson;
+        existing.UpdatedAtUtc = DateTime.UtcNow;
+
+        await _workflowEngine.UpdateWorkflowRuleAsync(existing);
         return NoContent();
     }
 

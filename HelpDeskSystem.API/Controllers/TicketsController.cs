@@ -3,8 +3,10 @@ using HelpDeskSystem.Application.DTOs.Messages;
 using HelpDeskSystem.Application.DTOs.Tickets;
 using HelpDeskSystem.Application.Interfaces;
 using HelpDeskSystem.Domain.Enums;
+using HelpDeskSystem.Persistence.Context;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace HelpDeskSystem.API.Controllers;
 
@@ -15,11 +17,13 @@ public class TicketsController : ControllerBase
 {
     private readonly ITicketService _ticketService;
     private readonly ITicketMessageService _messageService;
+    private readonly HelpDeskDbContext _context;
 
-    public TicketsController(ITicketService ticketService, ITicketMessageService messageService)
+    public TicketsController(ITicketService ticketService, ITicketMessageService messageService, HelpDeskDbContext context)
     {
         _ticketService = ticketService;
         _messageService = messageService;
+        _context = context;
     }
 
     [HttpPost]
@@ -151,6 +155,40 @@ public class TicketsController : ControllerBase
         return Ok(grouped);
     }
 
+    [HttpGet("metadata/categories")]
+    public async Task<ActionResult<IEnumerable<TicketLookupDto>>> GetCategories()
+    {
+        var categories = await _context.TicketCategories
+            .AsNoTracking()
+            .Where(c => c.IsActive && !c.IsDeleted)
+            .OrderBy(c => c.Name)
+            .Select(c => new TicketLookupDto
+            {
+                Id = c.Id,
+                Name = c.Name
+            })
+            .ToListAsync();
+
+        return Ok(categories);
+    }
+
+    [HttpGet("metadata/priorities")]
+    public async Task<ActionResult<IEnumerable<TicketLookupDto>>> GetPriorities()
+    {
+        var priorities = await _context.TicketPriorities
+            .AsNoTracking()
+            .Where(p => !p.IsDeleted)
+            .OrderBy(p => p.Level)
+            .Select(p => new TicketLookupDto
+            {
+                Id = p.Id,
+                Name = p.Name
+            })
+            .ToListAsync();
+
+        return Ok(priorities);
+    }
+
     [HttpPost("{id}/sla/pause")]
     [Authorize(Roles = "Agent,Admin,SuperAdmin")]
     public async Task<IActionResult> PauseSla(int id, [FromBody] SlaPauseResumeRequest request)
@@ -226,6 +264,23 @@ public class TicketsController : ControllerBase
         return Ok(messages);
     }
 
+    [HttpPost("{id}/comments")]
+    public Task<ActionResult<TicketMessageDto>> AddComment(int id, [FromBody] AddTicketCommentRequest request)
+    {
+        return SendMessage(id, new CreateTicketMessageDto
+        {
+            Message = request.Content,
+            MessageType = TicketMessageType.Message,
+            IsInternalNote = request.IsInternal
+        });
+    }
+
+    [HttpGet("{id}/comments")]
+    public Task<ActionResult<IEnumerable<TicketMessageDto>>> GetComments(int id)
+    {
+        return GetMessages(id);
+    }
+
     private bool CanAccessTicket(TicketDto ticket)
     {
         if (IsSuperAdmin())
@@ -253,4 +308,16 @@ public class ChangeStatusRequest
 public class SlaPauseResumeRequest
 {
     public string Reason { get; set; } = string.Empty;
+}
+
+public class AddTicketCommentRequest
+{
+    public string Content { get; set; } = string.Empty;
+    public bool IsInternal { get; set; }
+}
+
+public class TicketLookupDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
 }

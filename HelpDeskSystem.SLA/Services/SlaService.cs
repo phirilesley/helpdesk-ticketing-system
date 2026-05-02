@@ -48,6 +48,8 @@ public class SlaService : ISlaService
         var responseDeadline = await _businessTimeService.AddBusinessMinutesAsync(ticket.TenantId, ticket.CreatedAtUtc, slaRule.ResponseTimeMinutes);
         var resolutionDeadline = await _businessTimeService.AddBusinessMinutesAsync(ticket.TenantId, ticket.CreatedAtUtc, slaRule.ResolutionTimeMinutes);
 
+        var matrixPause = await IsPausedByMatrixRulesAsync(ticket);
+
         var pausedMinutes = ticket.SlaPausedTotalMinutes;
         if (ticket.IsSlaPaused && ticket.SlaPausedAtUtc.HasValue)
         {
@@ -59,8 +61,9 @@ public class SlaService : ISlaService
             resolutionDeadline = resolutionDeadline.AddMinutes(pausedMinutes);
         }
 
-        var isResponseBreached = !ticket.IsSlaPaused && now > responseDeadline && ticket.Status == TicketStatus.New;
-        var isResolutionBreached = !ticket.IsSlaPaused && now > resolutionDeadline && ticket.Status != TicketStatus.Closed;
+        var paused = ticket.IsSlaPaused || matrixPause;
+        var isResponseBreached = !paused && now > responseDeadline && ticket.Status == TicketStatus.New;
+        var isResolutionBreached = !paused && now > resolutionDeadline && ticket.Status != TicketStatus.Closed;
 
         return new SlaResult
         {
@@ -83,6 +86,7 @@ public class SlaService : ISlaService
 
         foreach (var ticket in activeTickets)
         {
+            await ApplyPauseMatrixStateAsync(ticket);
             var slaResult = await CalculateSlaForTicketAsync(ticket.Id);
             if (slaResult.IsBreached)
             {
@@ -175,12 +179,13 @@ public class SlaService : ISlaService
 
     private async Task HandleSlaBreachAsync(int ticketId, SlaResult slaResult)
     {
+        var ticket = await _context.Tickets
+            .FirstOrDefaultAsync(t => t.Id == ticketId);
+        if (ticket == null)
+            return;
+
         // Escalate ticket
         await _ticketService.ChangeTicketStatusAsync(ticketId, TicketStatus.Escalated, 0, "SLA Breached");
-
-        var ticket = await _context.Tickets
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Id == ticketId);
 
         if (ticket?.AssignedToUserId is int assignedUserId && assignedUserId > 0)
         {
@@ -222,5 +227,140 @@ public class SlaService : ISlaService
                 IsResolutionBreached = slaResult.IsResolutionBreached
             }),
             cancellationToken: CancellationToken.None);
+
+        await ExecuteBreachActionChainAsync(ticket!, slaResult);
+    }
+
+    private async Task ExecuteBreachActionChainAsync(Ticket ticket, SlaResult slaResult)
+    {
+        var actions = await _context.SlaBreachActions
+            .Where(x => x.TenantId == ticket.TenantId && x.IsEnabled && !x.IsDeleted)
+            .OrderBy(x => x.ExecutionOrder)
+            .ThenBy(x => x.Id)
+            .ToListAsync();
+
+        if (actions.Count == 0)
+            return;
+
+        var now = DateTime.UtcNow;
+        foreach (var action in actions)
+        {
+            if (action.BreachType.Equals("response", StringComparison.OrdinalIgnoreCase) && !slaResult.IsResponseBreached)
+                continue;
+            if (action.BreachType.Equals("resolution", StringComparison.OrdinalIgnoreCase) && !slaResult.IsResolutionBreached)
+                continue;
+
+            var breachAt = action.BreachType.Equals("response", StringComparison.OrdinalIgnoreCase)
+                ? slaResult.ResponseDeadline
+                : slaResult.ResolutionDeadline;
+            if (now < breachAt.AddMinutes(action.TriggerAfterBreachMinutes))
+                continue;
+
+            var config = ParseJsonObject(action.ActionConfigJson);
+            if (action.ActionType.Equals("notify_role", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!config.TryGetValue("role", out var roleName) || string.IsNullOrWhiteSpace(roleName))
+                    continue;
+
+                var userIds = await _context.UserRoles
+                    .Where(ur => ur.Role != null && ur.Role.Name == roleName)
+                    .Where(ur => ur.User != null && ur.User.IsActive && ur.User.TenantId == ticket.TenantId)
+                    .Select(ur => ur.UserId)
+                    .Distinct()
+                    .ToListAsync();
+
+                foreach (var userId in userIds)
+                {
+                    await _notificationService.NotifyAsync(
+                        userId,
+                        "SLA Breach Action",
+                        $"Ticket {ticket.TicketNumber} triggered SLA action '{action.Name}'.",
+                        NotificationType.Warning);
+                }
+            }
+            else if (action.ActionType.Equals("set_status", StringComparison.OrdinalIgnoreCase))
+            {
+                if (config.TryGetValue("status", out var statusValue)
+                    && Enum.TryParse<TicketStatus>(statusValue, true, out var status)
+                    && status != ticket.Status)
+                {
+                    await _ticketService.ChangeTicketStatusAsync(ticket.Id, status, 0, $"SLA action: {action.Name}");
+                }
+            }
+        }
+    }
+
+    private async Task ApplyPauseMatrixStateAsync(Ticket ticket)
+    {
+        var shouldPause = await IsPausedByMatrixRulesAsync(ticket);
+
+        if (shouldPause && !ticket.IsSlaPaused)
+        {
+            ticket.IsSlaPaused = true;
+            ticket.SlaPausedAtUtc = DateTime.UtcNow;
+            ticket.UpdatedAtUtc = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+        else if (!shouldPause && ticket.IsSlaPaused)
+        {
+            var now = DateTime.UtcNow;
+            if (ticket.SlaPausedAtUtc.HasValue)
+            {
+                ticket.SlaPausedTotalMinutes += (int)Math.Max(0, Math.Floor((now - ticket.SlaPausedAtUtc.Value).TotalMinutes));
+            }
+
+            ticket.IsSlaPaused = false;
+            ticket.SlaPausedAtUtc = null;
+            ticket.UpdatedAtUtc = now;
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    private async Task<bool> IsPausedByMatrixRulesAsync(Ticket ticket)
+    {
+        var rules = await _context.SlaPauseRules
+            .Where(x => x.TenantId == ticket.TenantId && x.IsEnabled && !x.IsDeleted)
+            .ToListAsync();
+
+        foreach (var rule in rules)
+        {
+            var conditions = ParseJsonObject(rule.ConditionJson);
+            if (conditions.Count == 0)
+                continue;
+
+            if (conditions.TryGetValue("status", out var statusRaw))
+            {
+                var allowedStatuses = statusRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (!allowedStatuses.Contains(ticket.Status.ToString(), StringComparer.OrdinalIgnoreCase))
+                    continue;
+            }
+
+            if (conditions.TryGetValue("priority", out var priorityRaw))
+            {
+                var allowedPriorities = priorityRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                var ticketPriority = ticket.Priority?.Name ?? string.Empty;
+                if (!allowedPriorities.Contains(ticketPriority, StringComparer.OrdinalIgnoreCase))
+                    continue;
+            }
+
+            return rule.PauseResponseSla || rule.PauseResolutionSla;
+        }
+
+        return false;
+    }
+
+    private static Dictionary<string, string> ParseJsonObject(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return [];
+
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
     }
 }

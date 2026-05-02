@@ -7,7 +7,6 @@ import {
   TextField,
   Button,
   Avatar,
-  Divider,
   Alert,
   Grid,
   Paper
@@ -85,7 +84,7 @@ const Profile: React.FC = () => {
                 {user?.email}
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                Role: {user?.role}
+                Role: {user?.roles?.join(', ') || 'N/A'}
               </Typography>
             </CardContent>
           </Card>

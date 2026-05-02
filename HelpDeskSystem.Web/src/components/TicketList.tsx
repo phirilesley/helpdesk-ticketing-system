@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Box,
   Card,
@@ -15,57 +15,49 @@ import {
 } from '@mui/material';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useQuery } from 'react-query';
+import { getTickets, Ticket } from '../services/api';
 
-interface Ticket {
-  id: number;
-  ticketNumber: string;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  category: string;
-  createdAt: string;
-  updatedAt: string;
-}
+const pageSize = 9;
 
 const TicketList: React.FC = () => {
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
-  React.useEffect(() => {
-    fetchTickets();
-  }, [page, statusFilter, searchTerm]);
+  const { data, isLoading, error } = useQuery(['tickets'], () => getTickets({ page: 1 }));
+  const tickets = useMemo(() => data?.data ?? [], [data]);
 
-  const fetchTickets = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        page: page.toString(),
-        ...(statusFilter && { status: statusFilter }),
-        ...(searchTerm && { search: searchTerm })
-      });
-      
-      const response = await axios.get(`/api/tickets?${params}`);
-      setTickets(response.data.data || response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch tickets');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filteredTickets = useMemo(() => {
+    return tickets.filter((ticket) => {
+      const statusMatch = !statusFilter || ticket.status === statusFilter;
+      const search = searchTerm.trim().toLowerCase();
+      const searchMatch = !search
+        || ticket.ticketNumber.toLowerCase().includes(search)
+        || ticket.title.toLowerCase().includes(search)
+        || ticket.description.toLowerCase().includes(search)
+        || ticket.category.toLowerCase().includes(search);
+
+      return statusMatch && searchMatch;
+    });
+  }, [tickets, statusFilter, searchTerm]);
+
+  const pagedTickets = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return filteredTickets.slice(startIndex, startIndex + pageSize);
+  }, [filteredTickets, page]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredTickets.length / pageSize));
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'open': return 'error';
-      case 'in_progress': return 'warning';
+      case 'new': return 'info';
+      case 'inprogress': return 'warning';
+      case 'waiting': return 'secondary';
       case 'resolved': return 'success';
       case 'closed': return 'default';
+      case 'escalated': return 'error';
       default: return 'default';
     }
   };
@@ -80,7 +72,7 @@ const TicketList: React.FC = () => {
     }
   };
 
-  if (loading && tickets.length === 0) {
+  if (isLoading && tickets.length === 0) {
     return (
       <Box display="flex" justifyContent="center" p={4}>
         <CircularProgress />
@@ -102,7 +94,7 @@ const TicketList: React.FC = () => {
         </Button>
       </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>Failed to fetch tickets</Alert>}
 
       <Grid container spacing={2} mb={3}>
         <Grid item xs={12} md={6}>
@@ -110,7 +102,10 @@ const TicketList: React.FC = () => {
             fullWidth
             label="Search tickets..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
           />
         </Grid>
         <Grid item xs={12} md={3}>
@@ -119,19 +114,24 @@ const TicketList: React.FC = () => {
             select
             label="Status"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
           >
             <MenuItem value="">All Statuses</MenuItem>
-            <MenuItem value="Open">Open</MenuItem>
-            <MenuItem value="In Progress">In Progress</MenuItem>
+            <MenuItem value="New">New</MenuItem>
+            <MenuItem value="InProgress">In Progress</MenuItem>
+            <MenuItem value="Waiting">Waiting</MenuItem>
             <MenuItem value="Resolved">Resolved</MenuItem>
             <MenuItem value="Closed">Closed</MenuItem>
+            <MenuItem value="Escalated">Escalated</MenuItem>
           </TextField>
         </Grid>
       </Grid>
 
       <Grid container spacing={3}>
-        {tickets.map((ticket) => (
+        {pagedTickets.map((ticket: Ticket) => (
           <Grid item xs={12} md={6} lg={4} key={ticket.id}>
             <Card
               sx={{
@@ -163,15 +163,15 @@ const TicketList: React.FC = () => {
                     />
                   </Box>
                 </Box>
-                
+
                 <Typography variant="body1" gutterBottom>
                   {ticket.title}
                 </Typography>
-                
+
                 <Typography variant="body2" color="text.secondary" noWrap>
                   {ticket.description}
                 </Typography>
-                
+
                 <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
                   <Typography variant="caption" color="text.secondary">
                     Category: {ticket.category}
@@ -186,7 +186,7 @@ const TicketList: React.FC = () => {
         ))}
       </Grid>
 
-      {tickets.length === 0 && !loading && (
+      {filteredTickets.length === 0 && !isLoading && (
         <Box textAlign="center" py={4}>
           <Typography variant="h6" color="text.secondary">
             No tickets found
@@ -199,9 +199,9 @@ const TicketList: React.FC = () => {
 
       <Box display="flex" justifyContent="center" mt={4}>
         <Pagination
-          count={10}
-          page={page}
-          onChange={(e, value) => setPage(value)}
+          count={pageCount}
+          page={Math.min(page, pageCount)}
+          onChange={(_, value) => setPage(value)}
           color="primary"
         />
       </Box>

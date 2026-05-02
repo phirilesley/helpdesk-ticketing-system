@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -27,13 +27,11 @@ import {
 import {
   Download,
   Refresh,
-  TrendingUp,
   People,
   SupportAgent,
   Speed,
   Assessment,
   SentimentSatisfied,
-  Schedule,
   PriorityHigh
 } from '@mui/icons-material';
 import {
@@ -45,10 +43,7 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
   BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell
+  Bar
 } from 'recharts';
 import { format } from 'date-fns';
 import axios from 'axios';
@@ -95,8 +90,6 @@ interface AgentMetric {
   satisfactionScore: number;
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
-
 const AdminDashboard: React.FC = () => {
   const [realTimeMetrics, setRealTimeMetrics] = useState<RealTimeMetrics | null>(null);
   const [ticketTrends, setTicketTrends] = useState<TicketTrend[]>([]);
@@ -107,13 +100,7 @@ const AdminDashboard: React.FC = () => {
   const [error, setError] = useState('');
   const [timeRange, setTimeRange] = useState(30);
 
-  useEffect(() => {
-    fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, [timeRange]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -139,7 +126,13 @@ const AdminDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange]);
+
+  useEffect(() => {
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchDashboardData]);
 
   const handleExportReport = async () => {
     try {

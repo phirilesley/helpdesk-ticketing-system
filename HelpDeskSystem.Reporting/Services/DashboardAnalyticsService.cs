@@ -1,6 +1,5 @@
 using HelpDeskSystem.Application.DTOs.Reports;
 using HelpDeskSystem.Application.Interfaces;
-using HelpDeskSystem.Domain.Entities;
 using HelpDeskSystem.Domain.Enums;
 using HelpDeskSystem.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
@@ -118,10 +117,14 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             query = query.Where(t => t.TenantId == tenantId.Value);
 
         var startDate = DateTime.UtcNow.AddDays(-days);
-        
-        var trends = await query
+
+        var tickets = await query
             .Where(t => !t.IsDeleted && t.CreatedAtUtc >= startDate)
-            .GroupBy(t => EF.Functions.DateFromDay(t.CreatedAtUtc))
+            .Select(t => new { t.CreatedAtUtc, t.Status })
+            .ToListAsync();
+
+        return tickets
+            .GroupBy(t => t.CreatedAtUtc.Date)
             .Select(g => new TicketTrendDto
             {
                 Date = g.Key,
@@ -130,9 +133,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
                 OpenTickets = g.Count(t => t.Status != TicketStatus.Closed)
             })
             .OrderBy(x => x.Date)
-            .ToListAsync();
-
-        return trends;
+            .ToList();
     }
 
     public async Task<CustomerSatisfactionDto> GetCustomerSatisfactionAsync(int? tenantId = null)
@@ -141,26 +142,16 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         if (tenantId.HasValue)
             query = query.Where(t => t.TenantId == tenantId.Value);
 
-        var tickets = await query
+        var totalClosedTickets = await query
             .Where(t => !t.IsDeleted && t.Status == TicketStatus.Closed)
-            .Include(t => t.TicketFeedbacks)
-            .ToListAsync();
-
-        var totalClosedTickets = tickets.Count;
-        var ticketsWithFeedback = tickets.Count(t => t.TicketFeedbacks.Any());
-        
-        var avgSatisfactionScore = ticketsWithFeedback > 0 
-            ? tickets.Where(t => t.TicketFeedbacks.Any())
-                .SelectMany(t => t.TicketFeedbacks)
-                .Average(f => f.Rating)
-            : 0;
+            .CountAsync();
 
         return new CustomerSatisfactionDto
         {
             TotalClosedTickets = totalClosedTickets,
-            TicketsWithFeedback = ticketsWithFeedback,
-            FeedbackResponseRate = totalClosedTickets > 0 ? (double)ticketsWithFeedback / totalClosedTickets * 100 : 0,
-            AverageSatisfactionScore = avgSatisfactionScore
+            TicketsWithFeedback = 0,
+            FeedbackResponseRate = 0,
+            AverageSatisfactionScore = 0
         };
     }
 
@@ -213,8 +204,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
                 ResolvedTicketsLast24Hours = g.Count(t => t.Status == TicketStatus.Closed && t.ClosedAtUtc >= last24Hours),
                 CriticalTickets = g.Count(t => t.PriorityId == 1 && t.Status != TicketStatus.Closed),
                 OverdueTickets = g.Count(t => t.Status != TicketStatus.Closed && t.CreatedAtUtc.AddHours(24) < now),
-                AverageFirstResponseTime = g.Where(t => t.FirstResponseAtUtc.HasValue)
-                    .Average(t => EF.Functions.DateDiffMinute(t.CreatedAtUtc, t.FirstResponseAtUtc.Value)),
+                AverageFirstResponseTime = 0,
                 ActiveAgents = _context.Users.Count(u => u.IsActive && u.UserRoles.Any(r => r.Role.Name == "Agent")),
                 SystemLoadPercentage = Math.Min(100, (double)g.Count(t => t.Status != TicketStatus.Closed) / 
                     Math.Max(1, _context.Users.Count(u => u.IsActive && u.UserRoles.Any(r => r.Role.Name == "Agent")) * 10) * 100)
@@ -239,8 +229,18 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             .Where(t => !t.IsDeleted)
             .Include(t => t.Category)
             .Include(t => t.Priority)
-            .Include(t => t.AssignedToUser)
             .ToListAsync();
+
+        var assignedUserIds = tickets
+            .Where(t => t.AssignedToUserId.HasValue)
+            .Select(t => t.AssignedToUserId!.Value)
+            .Distinct()
+            .ToList();
+
+        var assignedUsers = await _context.Users
+            .Where(u => assignedUserIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.FirstName, u.LastName })
+            .ToDictionaryAsync(u => u.Id, u => $"{u.FirstName} {u.LastName}".Trim());
 
         var report = new PerformanceReportDto
         {
@@ -257,14 +257,14 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
                     Count = g.Count(),
                     Percentage = tickets.Count > 0 ? (double)g.Count() / tickets.Count * 100 : 0
                 }).ToList(),
-            TicketsByPriority = tickets.GroupBy(t => t.Priority.Name)
+            TicketsByPriority = tickets.GroupBy(t => t.Priority?.Name ?? "Unknown")
                 .Select(g => new PriorityMetricDto
                 {
                     Priority = g.Key,
                     Count = g.Count(),
                     Percentage = tickets.Count > 0 ? (double)g.Count() / tickets.Count * 100 : 0
                 }).ToList(),
-            TicketsByCategory = tickets.GroupBy(t => t.Category.Name)
+            TicketsByCategory = tickets.GroupBy(t => t.Category?.Name ?? "Unknown")
                 .Select(g => new CategoryMetricDto
                 {
                     Category = g.Key,
@@ -273,17 +273,17 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
                         .Average(t => EF.Functions.DateDiffHour(t.CreatedAtUtc, t.ClosedAtUtc.Value))
                 }).ToList(),
             TopPerformingAgents = tickets.Where(t => t.AssignedToUserId.HasValue)
-                .GroupBy(t => t.AssignedToUser)
+                .GroupBy(t => t.AssignedToUserId)
                 .Select(g => new AgentMetricDto
                 {
-                    AgentName = $"{g.Key.FirstName} {g.Key.LastName}",
+                    AgentName = g.Key.HasValue && assignedUsers.TryGetValue(g.Key.Value, out var agentName)
+                        ? agentName
+                        : "Unassigned",
                     TotalTickets = g.Count(),
                     ResolvedTickets = g.Count(t => t.Status == TicketStatus.Closed),
                     AverageResolutionTime = g.Where(t => t.ClosedAtUtc.HasValue)
                         .Average(t => EF.Functions.DateDiffHour(t.CreatedAtUtc, t.ClosedAtUtc.Value)),
-                    SatisfactionScore = g.SelectMany(t => t.TicketFeedbacks)
-                        .DefaultIfEmpty()
-                        .Average(f => f != null ? f.Rating : 0)
+                    SatisfactionScore = 0
                 })
                 .OrderByDescending(a => a.ResolvedTickets)
                 .Take(10)

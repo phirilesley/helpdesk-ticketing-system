@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Box,
   Card,
@@ -11,6 +11,7 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
+  ListItemButton,
   Paper,
   Grid,
   Accordion,
@@ -32,7 +33,7 @@ import {
   Category
 } from '@mui/icons-material';
 
-interface Article {
+interface ArticleItem {
   id: number;
   title: string;
   category: string;
@@ -48,59 +49,58 @@ const KnowledgeBase: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [expandedArticle, setExpandedArticle] = useState<string | false>(false);
 
-  // Mock data - in real app this would come from API
-  const articles: Article[] = [
+  const articles: ArticleItem[] = useMemo(() => [
     {
       id: 1,
-      title: "How to Reset Your Password",
-      category: "Account",
-      content: "To reset your password, click on the 'Forgot Password' link on the login page. Enter your email address and follow the instructions sent to your email. The reset link is valid for 24 hours.",
-      tags: ["password", "login", "account"],
+      title: 'How to Reset Your Password',
+      category: 'Account',
+      content: "To reset your password, click the 'Forgot Password' link on the login page. Enter your email address and follow the instructions sent to your email.",
+      tags: ['password', 'login', 'account'],
       views: 1250,
       helpful: 89,
-      lastUpdated: "2024-01-15"
+      lastUpdated: '2024-01-15'
     },
     {
       id: 2,
-      title: "Creating a New Support Ticket",
-      category: "Getting Started",
-      content: "To create a new ticket, click the 'Create Ticket' button in the navigation. Fill in the required fields including title, description, priority, and category. You can also attach files if needed.",
-      tags: ["ticket", "create", "support"],
+      title: 'Creating a New Support Ticket',
+      category: 'Getting Started',
+      content: "Click 'Create Ticket' in navigation, complete title, description, priority, and category, then submit.",
+      tags: ['ticket', 'create', 'support'],
       views: 980,
       helpful: 92,
-      lastUpdated: "2024-01-20"
+      lastUpdated: '2024-01-20'
     },
     {
       id: 3,
-      title: "Understanding Ticket Statuses",
-      category: "Tickets",
-      content: "Tickets go through several statuses: Open (newly created), In Progress (being worked on), Resolved (solution provided), and Closed (finalized). Each status represents a different stage in the support process.",
-      tags: ["status", "workflow", "process"],
+      title: 'Understanding Ticket Statuses',
+      category: 'Tickets',
+      content: 'Ticket statuses: New, InProgress, Waiting, Resolved, Closed, Reopened, and Escalated.',
+      tags: ['status', 'workflow', 'process'],
       views: 756,
       helpful: 85,
-      lastUpdated: "2024-01-18"
+      lastUpdated: '2024-01-18'
     },
     {
       id: 4,
-      title: "File Attachment Guidelines",
-      category: "Files",
-      content: "You can attach files up to 10MB in size. Supported formats include PDF, DOC, DOCX, XLS, XLSX, PNG, JPG, and ZIP. For security reasons, executable files are not allowed.",
-      tags: ["files", "attachments", "upload"],
+      title: 'File Attachment Guidelines',
+      category: 'Files',
+      content: 'Attach files up to 10MB. Common document and image formats are supported.',
+      tags: ['files', 'attachments', 'upload'],
       views: 623,
       helpful: 78,
-      lastUpdated: "2024-01-12"
+      lastUpdated: '2024-01-12'
     },
     {
       id: 5,
-      title: "Two-Factor Authentication Setup",
-      category: "Security",
-      content: "Enable two-factor authentication in your profile settings. You'll need an authenticator app like Google Authenticator or Microsoft Authenticator. Scan the QR code and enter the verification code to complete setup.",
-      tags: ["2fa", "security", "authentication"],
+      title: 'Two-Factor Authentication Setup',
+      category: 'Security',
+      content: 'Enable MFA under profile security settings and verify your authenticator app code.',
+      tags: ['2fa', 'security', 'authentication'],
       views: 445,
       helpful: 91,
-      lastUpdated: "2024-01-22"
+      lastUpdated: '2024-01-22'
     }
-  ];
+  ], []);
 
   const categories = [
     { name: 'all', label: 'All Categories', icon: <Category /> },
@@ -112,20 +112,25 @@ const KnowledgeBase: React.FC = () => {
     { name: 'Settings', label: 'Settings', icon: <Settings /> }
   ];
 
-  const filteredArticles = articles.filter(article => {
-    const matchesSearch = article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         article.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         article.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCategory = selectedCategory === 'all' || article.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredArticles = useMemo(
+    () => articles.filter((article) => {
+      const search = searchTerm.trim().toLowerCase();
+      const matchesSearch = !search
+        || article.title.toLowerCase().includes(search)
+        || article.content.toLowerCase().includes(search)
+        || article.tags.some((tag) => tag.toLowerCase().includes(search));
+      const matchesCategory = selectedCategory === 'all' || article.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    }),
+    [articles, searchTerm, selectedCategory]
+  );
 
-  const handleArticleExpand = (articleId: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
+  const handleArticleExpand = (articleId: string) => (_event: React.SyntheticEvent, isExpanded: boolean) => {
     setExpandedArticle(isExpanded ? articleId : false);
   };
 
   const getCategoryIcon = (categoryName: string) => {
-    const category = categories.find(cat => cat.name === categoryName);
+    const category = categories.find((cat) => cat.name === categoryName);
     return category?.icon || <Book />;
   };
 
@@ -135,10 +140,9 @@ const KnowledgeBase: React.FC = () => {
         Knowledge Base
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        Find answers to common questions and learn how to use the help desk system effectively.
+        Find answers to common questions and use guides.
       </Typography>
 
-      {/* Search Bar */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <TextField
           fullWidth
@@ -156,7 +160,6 @@ const KnowledgeBase: React.FC = () => {
       </Paper>
 
       <Grid container spacing={3}>
-        {/* Categories Sidebar */}
         <Grid item xs={12} md={3}>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>
@@ -164,48 +167,20 @@ const KnowledgeBase: React.FC = () => {
             </Typography>
             <List>
               {categories.map((category) => (
-                <ListItem
-                  key={category.name}
-                  button
-                  selected={selectedCategory === category.name}
-                  onClick={() => setSelectedCategory(category.name)}
-                >
-                  <ListItemIcon>
-                    {category.icon}
-                  </ListItemIcon>
-                  <ListItemText primary={category.label} />
+                <ListItem key={category.name} disablePadding>
+                  <ListItemButton
+                    selected={selectedCategory === category.name}
+                    onClick={() => setSelectedCategory(category.name)}
+                  >
+                    <ListItemIcon>{category.icon}</ListItemIcon>
+                    <ListItemText primary={category.label} />
+                  </ListItemButton>
                 </ListItem>
               ))}
             </List>
           </Paper>
-
-          {/* Quick Stats */}
-          <Paper sx={{ p: 2, mt: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Quick Stats
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Box display="flex" justifyContent="space-between">
-                <Typography variant="body2">Total Articles</Typography>
-                <Typography variant="body2" fontWeight="bold">{articles.length}</Typography>
-              </Box>
-              <Box display="flex" justifyContent="space-between">
-                <Typography variant="body2">Total Views</Typography>
-                <Typography variant="body2" fontWeight="bold">
-                  {articles.reduce((sum, article) => sum + article.views, 0)}
-                </Typography>
-              </Box>
-              <Box display="flex" justifyContent="space-between">
-                <Typography variant="body2">Avg. Helpfulness</Typography>
-                <Typography variant="body2" fontWeight="bold">
-                  {Math.round(articles.reduce((sum, article) => sum + article.helpful, 0) / articles.length)}%
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
         </Grid>
 
-        {/* Articles List */}
         <Grid item xs={12} md={9}>
           <Typography variant="h6" gutterBottom>
             {filteredArticles.length} articles found
@@ -217,7 +192,7 @@ const KnowledgeBase: React.FC = () => {
                 No articles found
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Try adjusting your search terms or browse different categories.
+                Try different search keywords or categories.
               </Typography>
             </Paper>
           ) : (
@@ -236,37 +211,35 @@ const KnowledgeBase: React.FC = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
                         <Chip size="small" label={article.category} />
                         <Typography variant="caption" color="text.secondary">
-                          {article.views} views • {article.helpful}% helpful
+                          {article.views} views | {article.helpful}% helpful
                         </Typography>
                       </Box>
                     </Box>
                   </Box>
                 </AccordionSummary>
                 <AccordionDetails>
-                  <Box>
-                    <Typography variant="body1" paragraph>
-                      {article.content}
-                    </Typography>
-                    
-                    <Divider sx={{ my: 2 }} />
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Tags: {article.tags.join(', ')}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                          Last updated: {article.lastUpdated}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <Button variant="outlined" size="small" sx={{ mr: 1 }}>
-                          👍 Helpful
-                        </Button>
-                        <Button variant="outlined" size="small">
-                          👎 Not Helpful
-                        </Button>
-                      </Box>
+                  <Typography variant="body1" paragraph>
+                    {article.content}
+                  </Typography>
+
+                  <Divider sx={{ my: 2 }} />
+
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Tags: {article.tags.join(', ')}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        Last updated: {article.lastUpdated}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Button variant="outlined" size="small" sx={{ mr: 1 }}>
+                        Helpful
+                      </Button>
+                      <Button variant="outlined" size="small">
+                        Not Helpful
+                      </Button>
                     </Box>
                   </Box>
                 </AccordionDetails>
@@ -276,13 +249,12 @@ const KnowledgeBase: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Popular Articles */}
       <Paper sx={{ p: 3, mt: 3 }}>
         <Typography variant="h6" gutterBottom>
           Popular Articles
         </Typography>
         <Grid container spacing={2}>
-          {articles
+          {[...articles]
             .sort((a, b) => b.views - a.views)
             .slice(0, 3)
             .map((article) => (
@@ -299,7 +271,7 @@ const KnowledgeBase: React.FC = () => {
                       {article.title}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {article.views} views • {article.helpful}% helpful
+                      {article.views} views | {article.helpful}% helpful
                     </Typography>
                   </CardContent>
                 </Card>

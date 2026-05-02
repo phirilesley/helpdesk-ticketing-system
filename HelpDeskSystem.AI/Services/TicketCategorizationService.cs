@@ -107,7 +107,7 @@ public class TicketCategorizationService : ITicketCategorizationService
         if (historicalMatch != null)
         {
             result.SuggestedCategory = historicalMatch.Category?.Name ?? result.SuggestedCategory;
-            result.SuggestedPriority = historicalMatch.PriorityId ?? result.SuggestedPriority;
+            result.SuggestedPriority = historicalMatch.PriorityId;
             result.Confidence = Math.Max(result.Confidence, 0.8); // Higher confidence with historical match
         }
         
@@ -134,7 +134,6 @@ public class TicketCategorizationService : ITicketCategorizationService
             .Where(u => u.IsActive && 
                        u.UserRoles.Any(r => r.Role.Name == "Agent") &&
                        !u.IsSuperAdmin)
-            .Include(u => u.AssignedTickets)
             .ToListAsync();
 
         var agentScores = new List<AgentScore>();
@@ -167,7 +166,7 @@ public class TicketCategorizationService : ITicketCategorizationService
     {
         var ticket = await _context.Tickets
             .Include(t => t.Category)
-            .Include(t => t.TicketComments)
+            .Include(t => t.Messages)
             .FirstOrDefaultAsync(t => t.Id == ticketId);
 
         if (ticket == null)
@@ -255,7 +254,6 @@ public class TicketCategorizationService : ITicketCategorizationService
             if (ticket != null)
             {
                 ticket.AssignedToUserId = topAgent.AgentId;
-                ticket.AssignedAtUtc = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
                 
                 _logger.LogInformation("Auto-assigned ticket {TicketId} to agent {AgentId}", ticketId, topAgent.AgentId);
@@ -390,7 +388,7 @@ public class TicketCategorizationService : ITicketCategorizationService
         }
 
         return await query
-            .Include(t => t.TicketComments)
+            .Include(t => t.Messages)
             .OrderByDescending(t => t.CreatedAtUtc)
             .Take(3)
             .ToListAsync();
@@ -399,11 +397,11 @@ public class TicketCategorizationService : ITicketCategorizationService
     private string GenerateResponseFromSimilarTickets(List<Ticket> similarTickets)
     {
         var responses = similarTickets
-            .SelectMany(t => t.TicketComments)
-            .Where(c => !c.IsInternal)
+            .SelectMany(t => t.Messages)
+            .Where(c => !c.IsInternalNote)
             .OrderByDescending(c => c.CreatedAtUtc)
             .Take(2)
-            .Select(c => c.Content)
+            .Select(c => c.Message)
             .ToList();
 
         if (responses.Any())

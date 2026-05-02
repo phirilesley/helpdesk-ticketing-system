@@ -107,6 +107,10 @@ builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<CheckSlaBreachesJob>();
 builder.Services.AddScoped<PurgeAuditLogsJob>();
 
+// Add enterprise services
+builder.Services.AddScoped<IExternalAuthService, ExternalAuthService>();
+builder.Services.AddWebhookServices();
+
 builder.Services.AddHangfire(config =>
 {
     config

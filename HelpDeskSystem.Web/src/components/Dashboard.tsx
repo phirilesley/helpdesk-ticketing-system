@@ -47,9 +47,11 @@ const Dashboard: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'New': return 'info';
-      case 'In Progress': return 'warning';
+      case 'InProgress': return 'warning';
+      case 'Waiting': return 'secondary';
       case 'Resolved': return 'success';
       case 'Closed': return 'default';
+      case 'Escalated': return 'error';
       default: return 'default';
     }
   };
