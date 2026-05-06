@@ -191,7 +191,7 @@ namespace HelpDeskSystem.DevOps.Services
                 // Create new branch reference
                 var newBranchRef = new
                 {
-                    ref = $"refs/heads/{branchName}",
+                    @ref = $"refs/heads/{branchName}",
                     sha = sourceRef.Object.Sha
                 };
 
@@ -290,7 +290,7 @@ namespace HelpDeskSystem.DevOps.Services
             {
                 var triggerRequest = new
                 {
-                    ref = "main",
+                    @ref = "main",
                     inputs = inputs
                 };
 
@@ -345,7 +345,7 @@ namespace HelpDeskSystem.DevOps.Services
             {
                 var deploymentRequest = new
                 {
-                    ref = deployment.Ref,
+                    @ref = deployment.Ref,
                     task = deployment.Task,
                     auto_merge = deployment.AutoMerge,
                     required_contexts = deployment.RequiredContexts,
@@ -436,382 +436,63 @@ namespace HelpDeskSystem.DevOps.Services
         }
     }
 
-    #region GitHub API Models
-
-    public class GitHubRepository
-    {
-        public int Id { get; set; }
-        public string NodeId { get; set; }
-        public string Name { get; set; }
-        public string FullName { get; set; }
-        public bool Private { get; set; }
-        public GitHubOwner Owner { get; set; }
-        public string HtmlUrl { get; set; }
-        public string Description { get; set; }
-        public bool Fork { get; set; }
-        public string Url { get; set; }
-        public string ForksUrl { get; set; }
-        public string KeysUrl { get; set; }
-        public string CollaboratorsUrl { get; set; }
-        public string TeamsUrl { get; set; }
-        public string HooksUrl { get; set; }
-        public string IssueEventsUrl { get; set; }
-        public string EventsUrl { get; set; }
-        public string AssigneesUrl { get; set; }
-        public string BranchesUrl { get; set; }
-        public string TagsUrl { get; set; }
-        public string BlobsUrl { get; set; }
-        public string GitTagsUrl { get; set; }
-        public string GitRefsUrl { get; set; }
-        public string TreesUrl { get; set; }
-        public string StatusesUrl { get; set; }
-        public string LanguagesUrl { get; set; }
-        public string StargazersUrl { get; set; }
-        public string ContributorsUrl { get; set; }
-        public string SubscribersUrl { get; set; }
-        public string SubscriptionUrl { get; set; }
-        public string CommitsUrl { get; set; }
-        public string GitCommitsUrl { get; set; }
-        public string CommentsUrl { get; set; }
-        public string IssueCommentUrl { get; set; }
-        public string ContentsUrl { get; set; }
-        public string CompareUrl { get; set; }
-        public string MergesUrl { get; set; }
-        public string ArchiveUrl { get; set; }
-        public string DownloadsUrl { get; set; }
-        public string IssuesUrl { get; set; }
-        public string PullsUrl { get; set; }
-        public string MilestonesUrl { get; set; }
-        public string NotificationsUrl { get; set; }
-        public string LabelsUrl { get; set; }
-        public string ReleasesUrl { get; set; }
-        public string DeploymentsUrl { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? PushedAt { get; set; }
-        public string GitUrl { get; set; }
-        public string SshUrl { get; set; }
-        public string CloneUrl { get; set; }
-        public string SvnUrl { get; set; }
-        public string Homepage { get; set; }
-        public int Size { get; set; }
-        public int StargazersCount { get; set; }
-        public int WatchersCount { get; set; }
-        public string Language { get; set; }
-        public bool HasIssues { get; set; }
-        public bool HasProjects { get; set; }
-        public bool HasDownloads { get; set; }
-        public bool HasWiki { get; set; }
-        public bool HasPages { get; set; }
-        public int ForksCount { get; set; }
-        public bool Archived { get; set; }
-        public bool Disabled { get; set; }
-        public int OpenIssuesCount { get; set; }
-        public GitHubLicense License { get; set; }
-        public List<GitHubTopic> Topics { get; set; }
-        public string DefaultBranch { get; set; }
-    }
-
-    public class GitHubOwner
-    {
-        public string Login { get; set; }
-        public int Id { get; set; }
-        public string NodeId { get; set; }
-        public string AvatarUrl { get; set; }
-        public string GravatarId { get; set; }
-        public string Url { get; set; }
-        public string HtmlUrl { get; set; }
-        public string FollowersUrl { get; set; }
-        public string FollowingUrl { get; set; }
-        public string GistsUrl { get; set; }
-        public string StarredUrl { get; set; }
-        public string SubscriptionsUrl { get; set; }
-        public string OrganizationsUrl { get; set; }
-        public string ReposUrl { get; set; }
-        public string EventsUrl { get; set; }
-        public string ReceivedEventsUrl { get; set; }
-        public string Type { get; set; }
-        public bool SiteAdmin { get; set; }
-    }
-
-    public class GitHubLicense
-    {
-        public string Key { get; set; }
-        public string Name { get; set; }
-        public string SpdxId { get; set; }
-        public string Url { get; set; }
-        public string NodeId { get; set; }
-    }
-
-    public class GitHubTopic
-    {
-        public string Name { get; set; }
-    }
-
-    public class GitHubCommit
-    {
-        public string Sha { get; set; }
-        public string NodeId { get; set; }
-        public string CommitUrl { get; set; }
-        public string HtmlUrl { get; set; }
-        public GitHubCommitDetails Commit { get; set; }
-        public GitHubAuthor Author { get; set; }
-        public GitHubCommitter Committer { get; set; }
-        public List<GitHubParent> Parents { get; set; }
-        public GitHubStats Stats { get; set; }
-        public List<GitHubFile> Files { get; set; }
-    }
-
-    public class GitHubCommitDetails
-    {
-        public GitHubAuthorInfo Author { get; set; }
-        public GitHubAuthorInfo Committer { get; set; }
-        public string Message { get; set; }
-        public GitHubCommitTree Tree { get; set; }
-        public string Url { get; set; }
-        public int CommentCount { get; set; }
-        public GitHubVerification Verification { get; set; }
-    }
-
-    public class GitHubAuthorInfo
-    {
-        public string Name { get; set; }
-        public string Email { get; set; }
-        public DateTime Date { get; set; }
-    }
-
-    public class GitHubCommitTree
-    {
-        public string Sha { get; set; }
-        public string Url { get; set; }
-    }
-
-    public class GitHubVerification
-    {
-        public bool Verified { get; set; }
-        public string Reason { get; set; }
-        public string Signature { get; set; }
-        public string Payload { get; set; }
-    }
-
-    public class GitHubParent
-    {
-        public string Sha { get; set; }
-        public string Url { get; set; }
-        public string HtmlUrl { get; set; }
-    }
-
-    public class GitHubStats
-    {
-        public int Total { get; set; }
-        public int Additions { get; set; }
-        public int Deletions { get; set; }
-    }
-
-    public class GitHubFile
-    {
-        public string Sha { get; set; }
-        public string Filename { get; set; }
-        public string Status { get; set; }
-        public int Additions { get; set; }
-        public int Deletions { get; set; }
-        public int Changes { get; set; }
-        public string BlobUrl { get; set; }
-        public string RawUrl { get; set; }
-        public string ContentsUrl { get; set; }
-        public string Patch { get; set; }
-    }
-
-    public class GitHubBranch
-    {
-        public string Name { get; set; }
-        public GitHubCommit Commit { get; set; }
-        public bool Protected { get; set; }
-        public GitHubProtection Protection { get; set; }
-        public GitHubProtectionUrl ProtectionUrl { get; set; }
-    }
-
-    public class GitHubProtection
-    {
-        public bool Enabled { get; set; }
-        public bool RequiredStatusChecks { get; set; }
-        public bool EnforceAdmins { get; set; }
-        public bool RequiredPullRequestReviews { get; set; }
-        public bool Restrictions { get; set; }
-    }
-
-    public class GitHubProtectionUrl
-    {
-        public string Url { get; set; }
-    }
-
-    public class GitHubPullRequest
-    {
-        public string Url { get; set; }
-        public int Id { get; set; }
-        public string NodeId { get; set; }
-        public string HtmlUrl { get; set; }
-        public string DiffUrl { get; set; }
-        public string PatchUrl { get; set; }
-        public string IssueUrl { get; set; }
-        public int Number { get; set; }
-        public string State { get; set; }
-        public bool Locked { get; set; }
-        public string Title { get; set; }
-        public GitHubUser User { get; set; }
-        public GitHubUser Assignee { get; set; }
-        public List<GitHubUser> Assignees { get; set; }
-        public List<GitHubUser> RequestedReviewers { get; set; }
-        public List<GitHubUser> RequestedTeams { get; set; }
-        public GitHubLabel[] Labels { get; set; }
-        public GitHubMilestone Milestone { get; set; }
-        public bool Draft { get; set; }
-        public GitHubPullRequestHead Head { get; set; }
-        public GitHubPullRequestBase Base { get; set; }
-        public GitHubPullRequestLinks _Links { get; set; }
-        public GitHubAuthor Author { get; set; }
-        public GitHubCommitter Committer { get; set; }
-        public List<GitHubReview> ReviewComments { get; set; }
-        public int ReviewCommentCount { get; set; }
-        public List<GitHubCommit> Commits { get; set; }
-        public List<GitHubFile> Files { get; set; }
-        public GitHubPatch Patch { get; set; }
-        public int Comments { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? ClosedAt { get; set; }
-        public DateTime? MergedAt { get; set; }
-        public bool Merged { get; set; }
-        public GitHubUser MergedBy { get; set; }
-        public int Additions { get; set; }
-        public int Deletions { get; set; }
-        public int ChangedFiles { get; set; }
-    }
-
-    public class GitHubUser
-    {
-        public string Login { get; set; }
-        public int Id { get; set; }
-        public string NodeId { get; set; }
-        public string AvatarUrl { get; set; }
-        public string GravatarId { get; set; }
-        public string Url { get; set; }
-        public string HtmlUrl { get; set; }
-        public string FollowersUrl { get; set; }
-        public string FollowingUrl { get; set; }
-        public string GistsUrl { get; set; }
-        public string StarredUrl { get; set; }
-        public string SubscriptionsUrl { get; set; }
-        public string OrganizationsUrl { get; set; }
-        public string ReposUrl { get; set; }
-        public string EventsUrl { get; set; }
-        public string ReceivedEventsUrl { get; set; }
-        public string Type { get; set; }
-        public bool SiteAdmin { get; set; }
-    }
-
-    public class GitHubLabel
-    {
-        public int Id { get; set; }
-        public string NodeId { get; set; }
-        public string Url { get; set; }
-        public string Name { get; set; }
-        public string Color { get; set; }
-        public string Description { get; set; }
-        public bool Default { get; set; }
-    }
-
-    public class GitHubMilestone
-    {
-        public string Url { get; set; }
-        public string HtmlUrl { get; set; }
-        public string LabelsUrl { get; set; }
-        public int Id { get; set; }
-        public string NodeId { get; set; }
-        public int Number { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public GitHubUser Creator { get; set; }
-        public int OpenIssues { get; set; }
-        public int ClosedIssues { get; set; }
-        public string State { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? DueOn { get; set; }
-        public DateTime? ClosedAt { get; set; }
-    }
-
-    public class GitHubPullRequestHead
-    {
-        public string Label { get; set; }
-        public string Ref { get; set; }
-        public string Sha { get; set; }
-        public GitHubUser User { get; set; }
-        public GitHubRepository Repo { get; set; }
-    }
-
-    public class GitHubPullRequestBase
-    {
-        public string Label { get; set; }
-        public string Ref { get; set; }
-        public string Sha { get; set; }
-        public GitHubUser User { get; set; }
-        public GitHubRepository Repo { get; set; }
-    }
-
-    public class GitHubPullRequestLinks
-    {
-        public GitHubLink Self { get; set; }
-        public GitHubLink Html { get; set; }
-        public GitHubLink Issue { get; set; }
-        public GitHubLink Comments { get; set; }
-        public GitHubLink ReviewComments { get; set; }
-        public GitHubLink ReviewComment { get; set; }
-        public GitHubLink Commits { get; set; }
-        public GitHubLink Statuses { get; set; }
-        public GitHubLink PullRequest { get; set; }
-    }
+    #region Unique GitHub API Models (not in DevOpsModels.cs)
 
     public class GitHubLink
     {
         public string Href { get; set; }
     }
 
-    public class GitHubStatus
+    public class GitHubCommitter
     {
-        public string Url { get; set; }
-        public int Id { get; set; }
-        public string NodeId { get; set; }
-        public string State { get; set; }
-        public string TargetUrl { get; set; }
-        public string Description { get; set; }
-        public string Context { get; set; }
-        public GitHubUser Creator { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
+        public string Login { get; set; }
+        public string AvatarUrl { get; set; }
     }
 
-    public class GitHubWorkflowRun
+    public class GitHubPatch
     {
-        public int Id { get; set; }
+        public string Content { get; set; }
+    }
+
+    public class GitHubPullRequestHead
+    {
+        public string Ref { get; set; }
+        public string Sha { get; set; }
+    }
+
+    public class GitHubPullRequestBase
+    {
+        public string Ref { get; set; }
+        public string Sha { get; set; }
+    }
+
+    public class GitHubPullRequestLinks
+    {
+        public GitHubLink Html { get; set; }
+        public GitHubLink Commits { get; set; }
+        public GitHubLink Statuses { get; set; }
+        public GitHubLink PullRequest { get; set; }
+    }
+
+    public class GitHubReview
+    {
+        public long Id { get; set; }
+        public string Body { get; set; }
+        public string State { get; set; }
+    }
+
+    public class GitHubLabel
+    {
+        public long Id { get; set; }
         public string Name { get; set; }
-        public string HeadBranch { get; set; }
-        public string HeadSha { get; set; }
-        public GitHubWorkflowRunStatus Status { get; set; }
-        public GitHubWorkflowRunConclusion Conclusion { get; set; }
-        public GitHubWorkflowRunWorkflow Workflow { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? RunStartedAt { get; set; }
-        public List<GitHubWorkflowRunJob> Jobs { get; set; }
-        public GitHubWorkflowRunCheckSuiteUrl CheckSuiteUrl { get; set; }
-        public GitHubWorkflowRunLogsUrl LogsUrl { get; set; }
-        public GitHubWorkflowRunCheckSuiteUrl CheckSuiteUrl { get; set; }
-        public GitHubWorkflowRunArtifactsUrl ArtifactsUrl { get; set; }
-        public GitHubWorkflowRunCancelUrl CancelUrl { get; set; }
-        public GitHubWorkflowRunRerunUrl RerunUrl { get; set; }
-        public GitHubWorkflowRunWorkflowUrl WorkflowUrl { get; set; }
-        public GitHubWorkflowRunHtmlUrl HtmlUrl { get; set; }
+        public string Color { get; set; }
+    }
+
+    public class GitHubMilestone
+    {
+        public long Id { get; set; }
+        public string Title { get; set; }
+        public string State { get; set; }
     }
 
     public enum GitHubWorkflowRunStatus
@@ -862,7 +543,7 @@ namespace HelpDeskSystem.DevOps.Services
         public DateTime? CompletedAt { get; set; }
         public string Name { get; set; }
         public List<string> Steps { get; set; }
-        public int CheckRunUrl { get; set; }
+        public string CheckRunUrl { get; set; }
         public List<string> Labels { get; set; }
         public int RunnerId { get; set; }
         public string RunnerName { get; set; }
@@ -892,101 +573,6 @@ namespace HelpDeskSystem.DevOps.Services
     {
         public int TotalCount { get; set; }
         public List<GitHubWorkflowRun> WorkflowRuns { get; set; }
-    }
-
-    public class GitHubDeploymentRequest
-    {
-        public string Ref { get; set; }
-        public string Task { get; set; }
-        public bool AutoMerge { get; set; }
-        public List<string> RequiredContexts { get; set; }
-        public object Payload { get; set; }
-        public string Environment { get; set; }
-        public string Description { get; set; }
-    }
-
-    public class GitHubDeployment
-    {
-        public string Url { get; set; }
-        public int Id { get; set; }
-        public string NodeId { get; set; }
-        public string Sha { get; set; }
-        public string Ref { get; set; }
-        public string Task { get; set; }
-        public GitHubDeploymentPayload Payload { get; set; }
-        public string Environment { get; set; }
-        public string Description { get; set; }
-        public GitHubUser Creator { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public GitHubDeploymentStatuses Statuses { get; set; }
-    }
-
-    public class GitHubDeploymentPayload
-    {
-        public object Data { get; set; }
-    }
-
-    public class GitHubDeploymentStatuses
-    {
-        public string Url { get; set; }
-        public int Id { get; set; }
-        public string NodeId { get; set; }
-        public string State { get; set; }
-        public string TargetUrl { get; set; }
-        public string Description { get; set; }
-        public GitHubUser Creator { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-    }
-
-    public class GitHubRelease
-    {
-        public string Url { get; set; }
-        public string HtmlUrl { get; set; }
-        public string AssetsUrl { get; set; }
-        public string UploadUrl { get; set; }
-        public string TarballUrl { get; set; }
-        public string ZipballUrl { get; set; }
-        public int Id { get; set; }
-        public string NodeId { get; set; }
-        public string TagName { get; set; }
-        public string TargetCommitish { get; set; }
-        public string Name { get; set; }
-        public string Body { get; set; }
-        public bool Draft { get; set; }
-        public bool Prerelease { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime PublishedAt { get; set; }
-        public GitHubAuthor Author { get; set; }
-        public List<GitHubAsset> Assets { get; set; }
-    }
-
-    public class GitHubReleaseRequest
-    {
-        public string TagName { get; set; }
-        public string TargetCommitish { get; set; }
-        public string Name { get; set; }
-        public string Body { get; set; }
-        public bool Draft { get; set; }
-        public bool Prerelease { get; set; }
-    }
-
-    public class GitHubAsset
-    {
-        public string Url { get; set; }
-        public int Id { get; set; }
-        public string NodeId { get; set; }
-        public string Name { get; set; }
-        public string Label { get; set; }
-        public GitHubAuthor Uploader { get; set; }
-        public string ContentType { get; set; }
-        public string State { get; set; }
-        public int Size { get; set; }
-        public int DownloadCount { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public string BrowserDownloadUrl { get; set; }
     }
 
     public class GitHubReference

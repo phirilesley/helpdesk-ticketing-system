@@ -1,6 +1,8 @@
-namespace HelpDeskSystem.Workflow;
+using HelpDeskSystem.Workflow.Visual.Models;
 
-public interface IWorkflowEngine
+namespace HelpDeskSystem.Workflow.Visual;
+
+public interface IVisualWorkflowEngine
 {
     Task<WorkflowDefinition> CreateWorkflowAsync(WorkflowDefinition workflow);
     Task<WorkflowDefinition> UpdateWorkflowAsync(WorkflowDefinition workflow);

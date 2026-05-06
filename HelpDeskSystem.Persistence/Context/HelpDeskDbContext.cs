@@ -65,6 +65,10 @@ public class HelpDeskDbContext : DbContext
     public DbSet<SlaPauseRule> SlaPauseRules { get; set; }
     public DbSet<SlaBreachAction> SlaBreachActions { get; set; }
     public DbSet<DsrProcessingLog> DsrProcessingLogs { get; set; }
+    public DbSet<OutboundChannelMessage> OutboundChannelMessages { get; set; }
+    public DbSet<OutboundDeliveryReceipt> OutboundDeliveryReceipts { get; set; }
+    public DbSet<TenantRegionPolicy> TenantRegionPolicies { get; set; }
+    public DbSet<RegionSyntheticCheck> RegionSyntheticChecks { get; set; }
     public DbSet<WebhookDelivery> WebhookDeliveries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -158,6 +162,23 @@ public class HelpDeskDbContext : DbContext
 
         modelBuilder.Entity<DsrProcessingLog>()
             .HasIndex(x => new { x.TenantId, x.DataSubjectRequestId, x.CreatedAtUtc });
+
+        modelBuilder.Entity<OutboundChannelMessage>()
+            .HasIndex(x => new { x.ConnectorId, x.IdempotencyKey })
+            .IsUnique();
+
+        modelBuilder.Entity<OutboundChannelMessage>()
+            .HasIndex(x => new { x.Status, x.NextAttemptAtUtc, x.PartitionKey });
+
+        modelBuilder.Entity<OutboundDeliveryReceipt>()
+            .HasIndex(x => new { x.OutboundChannelMessageId, x.ProviderMessageId, x.Status });
+
+        modelBuilder.Entity<TenantRegionPolicy>()
+            .HasIndex(x => x.TenantId)
+            .IsUnique();
+
+        modelBuilder.Entity<RegionSyntheticCheck>()
+            .HasIndex(x => new { x.TenantId, x.Region, x.CheckedAtUtc });
 
         modelBuilder.Entity<WebhookDelivery>()
             .HasIndex(d => new { d.SubscriptionId, d.Status, d.NextAttemptAtUtc });

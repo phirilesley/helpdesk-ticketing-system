@@ -70,7 +70,7 @@ namespace HelpDeskSystem.Marketing.Services
         Task<List<CustomerSegment>> GetCustomerSegments(SegmentFilter filter = null);
         Task<List<CRMContact>> GetSegmentContacts(string segmentId);
         Task<SegmentationRule> CreateSegmentationRule(SegmentationRule rule);
-        Task<bool> UpdateSegmentMembership();
+        Task<bool> UpdateSegmentMembership(CustomerSegment? segment = null);
 
         // Marketing Automation Workflows
         Task<AutomationWorkflow> CreateAutomationWorkflow(AutomationWorkflow workflow);
@@ -491,9 +491,9 @@ namespace HelpDeskSystem.Marketing.Services
                     {
                         ContentId = item.ContentId,
                         Title = item.Title,
-                        PublishDate = item.PublishDate,
+                        PublishDate = item.PublishDate ?? DateTime.UtcNow,
                         Platform = item.Platform,
-                        Status = item.Status
+                        Status = item.Status.ToString()
                     });
                 }
 
@@ -663,28 +663,28 @@ namespace HelpDeskSystem.Marketing.Services
             }
         }
 
-        public async Task<bool> UpdateSegmentMembership()
+        public async Task<bool> UpdateSegmentMembership(CustomerSegment? segment = null)
         {
             try
             {
                 var segments = await GetCustomerSegments();
                 var updatedCount = 0;
 
-                foreach (var segment in segments)
+                foreach (var seg in segments)
                 {
                     var contacts = await GetAllCRMContacts();
                     var segmentMembers = new List<string>();
 
                     foreach (var contact in contacts)
                     {
-                        if (await IsContactInSegment(contact, segment))
+                        if (await IsContactInSegment(contact, seg))
                         {
                             segmentMembers.Add(contact.ContactId);
                         }
                     }
 
                     // Update segment membership
-                    await UpdateSegmentMembers(segment.SegmentId, segmentMembers);
+                    await UpdateSegmentMembers(seg.SegmentId, segmentMembers);
                     updatedCount++;
                 }
 
@@ -1011,13 +1011,13 @@ namespace HelpDeskSystem.Marketing.Services
         private async Task SetupNurturingWorkflow(string leadId, NurturingCampaign campaign) => await Task.CompletedTask;
         private async Task PersonalizeNurturingContent(string leadId, NurturingCampaign campaign) => await Task.CompletedTask;
         private async Task SetupNurturingTracking(string leadId, NurturingCampaign campaign) => await Task.CompletedTask;
-        private async Task<List<CustomerSegment>> GetCustomerSegments(SegmentFilter filter = null) => await Task.FromResult(new List<CustomerSegment>());
+        public async Task<List<CustomerSegment>> GetCustomerSegments(SegmentFilter filter = null) => await Task.FromResult(new List<CustomerSegment>());
         private async Task<List<CRMContact>> GetAllCRMContacts() => await Task.FromResult(new List<CRMContact>());
         private async Task<bool> IsContactInSegment(CRMContact contact, CustomerSegment segment) => await Task.FromResult(true);
         private async Task UpdateSegmentMembers(string segmentId, List<string> members) => await Task.CompletedTask;
         private async Task ApplySegmentationRules(CustomerSegment segment) => await Task.CompletedTask;
         private async Task<int> CalculateSegmentSize(CustomerSegment segment) => await Task.FromResult(500);
-        private async Task<List<AutomationWorkflow>> GetAutomationWorkflows(WorkflowFilter filter = null) => await Task.FromResult(new List<AutomationWorkflow>());
+        public async Task<List<AutomationWorkflow>> GetAutomationWorkflows(WorkflowFilter filter = null) => await Task.FromResult(new List<AutomationWorkflow>());
         private async Task ValidateWorkflowLogic(AutomationWorkflow workflow) => await Task.CompletedTask;
         private async Task CompileWorkflow(AutomationWorkflow workflow) => await Task.CompletedTask;
         private async Task SetupWorkflowTriggers(AutomationWorkflow workflow) => await Task.CompletedTask;
@@ -1026,7 +1026,10 @@ namespace HelpDeskSystem.Marketing.Services
         private async Task LogWorkflowExecution(WorkflowExecution execution) => await Task.CompletedTask;
 
         // Placeholder implementations for remaining interface methods
+        public Task<CRMCompany> CreateCRMCompany(CRMCompany company) => Task.FromResult(new CRMCompany());
         public Task<List<CRMCompany>> GetCRMCompanies(CompanyFilter filter = null) => Task.FromResult(new List<CRMCompany>());
+        public Task<List<CRMDeal>> GetCRMDeals(DealFilter filter = null) => Task.FromResult(new List<CRMDeal>());
+        public Task<List<CRMContact>> GetSegmentContacts(string segmentId) => Task.FromResult(new List<CRMContact>());
         public Task<CRMActivity> LogCRMActivity(CRMActivity activity) => Task.FromResult(new CRMActivity());
         public Task<List<CRMActivity>> GetCRMActivities(ActivityFilter filter = null) => Task.FromResult(new List<CRMActivity>());
         public Task<EmailCampaign> UpdateEmailCampaign(string campaignId, EmailCampaign campaign) => Task.FromResult(new EmailCampaign());
@@ -1055,677 +1058,5 @@ namespace HelpDeskSystem.Marketing.Services
 
         #endregion
     }
-
-    #region Data Models
-
-    public class MarketingSettings
-    {
-        public string HubSpotAccessToken { get; set; }
-        public string SalesforceAccessToken { get; set; }
-        public string SalesforceUrl { get; set; }
-        public string TwitterAccessToken { get; set; }
-        public string TwitterApiSecret { get; set; }
-        public string FacebookAccessToken { get; set; }
-        public string FacebookPageId { get; set; }
-        public string LinkedInAccessToken { get; set; }
-        public string LinkedInClientId { get; set; }
-        public string GoogleAnalyticsApiKey { get; set; }
-        public bool EnableLeadScoring { get; set; } = true;
-        public bool EnableSocialListening { get; set; } = true;
-        public bool EnableContentOptimization { get; set; } = true;
-    }
-
-    // CRM Models
-    public class CRMContact
-    {
-        public string ContactId { get; set; }
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
-        public string Email { get; set; }
-        public string Phone { get; set; }
-        public string Company { get; set; }
-        public string Title { get; set; }
-        public ContactStatus Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public bool CreateTicket { get; set; }
-        public Dictionary<string, object> CustomFields { get; set; } = new Dictionary<string, object>();
-    }
-
-    public enum ContactStatus { Active, Inactive, Lead, Customer }
-
-    public class CRMFilter
-    {
-        public string Status { get; set; }
-        public string Company { get; set; }
-        public DateTime? CreatedAfter { get; set; }
-        public DateTime? CreatedBefore { get; set; }
-    }
-
-    public class CRMCompany
-    {
-        public string CompanyId { get; set; }
-        public string Name { get; set; }
-        public string Industry { get; set; }
-        public string Size { get; set; }
-        public string Website { get; set; }
-        public string Phone { get; set; }
-        public string Address { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-    }
-
-    public class CompanyFilter
-    {
-        public string Industry { get; set; }
-        public string Size { get; set; }
-        public string Location { get; set; }
-    }
-
-    public class CRMDeal
-    {
-        public string DealId { get; set; }
-        public string ContactId { get; set; }
-        public string DealName { get; set; }
-        public string Description { get; set; }
-        public decimal Amount { get; set; }
-        public string Currency { get; set; }
-        public DealStage Stage { get; set; }
-        public DateTime ExpectedCloseDate { get; set; }
-        public DealStatus Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public double DealScore { get; set; }
-        public List<string> Tags { get; set; } = new List<string>();
-    }
-
-    public enum DealStage { Prospect, Qualified, Proposal, Negotiation, ClosedWon, ClosedLost }
-
-    public enum DealStatus { Open, Won, Lost, Cancelled }
-
-    public class DealFilter
-    {
-        public DealStage? Stage { get; set; }
-        public DealStatus? Status { get; set; }
-        public DateTime? CloseDateFrom { get; set; }
-        public DateTime? CloseDateTo { get; set; }
-        public decimal? MinAmount { get; set; }
-        public decimal? MaxAmount { get; set; }
-    }
-
-    public class CRMActivity
-    {
-        public string ActivityId { get; set; }
-        public string ContactId { get; set; }
-        public ActivityType Type { get; set; }
-        public string Subject { get; set; }
-        public string Description { get; set; }
-        public DateTime ActivityDate { get; set; }
-        public string CreatedBy { get; set; }
-        public DateTime CreatedAt { get; set; }
-    }
-
-    public enum ActivityType { Call, Email, Meeting, Task, Note }
-
-    public class ActivityFilter
-    {
-        public string ContactId { get; set; }
-        public ActivityType? Type { get; set; }
-        public DateTime? DateFrom { get; set; }
-        public DateTime? DateTo { get; set; }
-    }
-
-    // Marketing Automation Models
-    public class EmailCampaign
-    {
-        public string CampaignId { get; set; }
-        public string Name { get; set; }
-        public string Subject { get; set; }
-        public string Content { get; set; }
-        public CampaignStatus Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? ScheduledAt { get; set; }
-        public DateTime? SentAt { get; set; }
-        public int AudienceSize { get; set; }
-        public bool EnableABTest { get; set; }
-        public List<EmailVariant> Variants { get; set; } = new List<EmailVariant>();
-        public Dictionary<string, object> Personalization { get; set; } = new Dictionary<string, object>();
-    }
-
-    public enum CampaignStatus { Draft, Scheduled, Sent, Completed, Cancelled }
-
-    public class CampaignFilter
-    {
-        public CampaignStatus? Status { get; set; }
-        public DateTime? CreatedFrom { get; set; }
-        public DateTime? CreatedTo { get; set; }
-    }
-
-    public class EmailVariant
-    {
-        public string VariantId { get; set; }
-        public string Subject { get; set; }
-        public string Content { get; set; }
-        public int SentCount { get; set; }
-        public int OpenedCount { get; set; }
-        public int ClickedCount { get; set; }
-    }
-
-    public class EmailTemplate
-    {
-        public string TemplateId { get; set; }
-        public string Name { get; set; }
-        public string Subject { get; set; }
-        public string HtmlContent { get; set; }
-        public string TextContent { get; set; }
-        public List<TemplateVariable> Variables { get; set; } = new List<TemplateVariable>();
-        public DateTime CreatedAt { get; set; }
-        public bool IsActive { get; set; }
-    }
-
-    public class TemplateVariable
-    {
-        public string Name { get; set; }
-        public string Type { get; set; }
-        public string DefaultValue { get; set; }
-        public bool Required { get; set; }
-    }
-
-    public class TemplateFilter
-    {
-        public bool? IsActive { get; set; }
-        public string Category { get; set; }
-    }
-
-    public class CampaignMetrics
-    {
-        public string CampaignId { get; set; }
-        public int Sent { get; set; }
-        public int Delivered { get; set; }
-        public int Opened { get; set; }
-        public int Clicked { get; set; }
-        public int Bounced { get; set; }
-        public int Unsubscribed { get; set; }
-        public double ConversionRate { get; set; }
-        public decimal Revenue { get; set; }
-        public decimal Cost { get; set; }
-        public decimal ROI { get; set; }
-        public DateTime GeneratedAt { get; set; }
-    }
-
-    public class LeadScoring
-    {
-        public string ContactId { get; set; }
-        public double OverallScore { get; set; }
-        public double DemographicScore { get; set; }
-        public double BehavioralScore { get; set; }
-        public double EngagementScore { get; set; }
-        public double PurchaseIntentScore { get; set; }
-        public string LeadGrade { get; set; }
-        public DateTime ScoredAt { get; set; }
-        public List<ScoringFactor> Factors { get; set; } = new List<ScoringFactor>();
-    }
-
-    public class ScoringFactor
-    {
-        public string Factor { get; set; }
-        public double Score { get; set; }
-        public double Weight { get; set; }
-    }
-
-    public class LeadFilter
-    {
-        public string Status { get; set; }
-        public double? MinScore { get; set; }
-        public double? MaxScore { get; set; }
-        public string Grade { get; set; }
-    }
-
-    // Social Media Models
-    public class SocialPost
-    {
-        public string PostId { get; set; }
-        public string Platform { get; set; }
-        public string Content { get; set; }
-        public PostType Type { get; set; }
-        public PostStatus Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? ScheduledAt { get; set; }
-        public DateTime? PublishedAt { get; set; }
-        public List<string> MediaUrls { get; set; } = new List<string>();
-        public Dictionary<string, object> PlatformSpecific { get; set; } = new Dictionary<string, object>();
-    }
-
-    public enum PostType { Text, Image, Video, Link, Story }
-
-    public enum PostStatus { Draft, Scheduled, Published, Archived }
-
-    public class SocialFilter
-    {
-        public string Platform { get; set; }
-        public PostStatus? Status { get; set; }
-        public DateTime? PublishedFrom { get; set; }
-        public DateTime? PublishedTo { get; set; }
-    }
-
-    public class SocialEngagement
-    {
-        public string PostId { get; set; }
-        public int Likes { get; set; }
-        public int Comments { get; set; }
-        public int Shares { get; set; }
-        public int Clicks { get; set; }
-        public int Impressions { get; set; }
-        public int Reach { get; set; }
-        public double EngagementRate { get; set; }
-        public DateTime MeasuredAt { get; set; }
-    }
-
-    public class SocialListening
-    {
-        public string BrandName { get; set; }
-        public DateTime StartDate { get; set; }
-        public DateTime EndDate { get; set; }
-        public List<SocialMention> Mentions { get; set; } = new List<SocialMention>();
-        public int TotalMentions { get; set; }
-        public int PositiveMentions { get; set; }
-        public int NegativeMentions { get; set; }
-        public int NeutralMentions { get; set; }
-        public List<SocialMention> InfluencerMentions { get; set; } = new List<SocialMention>();
-    }
-
-    public class SocialMention
-    {
-        public string MentionId { get; set; }
-        public string Platform { get; set; }
-        public string Content { get; set; }
-        public string Author { get; set; }
-        public string AuthorHandle { get; set; }
-        public DateTime MentionedAt { get; set; }
-        public double Sentiment { get; set; }
-        public bool IsInfluencer { get; set; }
-        public int FollowerCount { get; set; }
-        public string Url { get; set; }
-    }
-
-    public class SocialInfluencer
-    {
-        public string InfluencerId { get; set; }
-        public string Name { get; set; }
-        public string Handle { get; set; }
-        public string Platform { get; set; }
-        public int FollowerCount { get; set; }
-        public double EngagementRate { get; set; }
-        public List<string> Topics { get; set; } = new List<string>();
-        public string Location { get; set; }
-        public double InfluenceScore { get; set; }
-    }
-
-    // Content Management Models
-    public class ContentPiece
-    {
-        public string ContentId { get; set; }
-        public string Title { get; set; }
-        public string Content { get; set; }
-        public ContentType Type { get; set; }
-        public ContentStatus Status { get; set; }
-        public string AuthorId { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? PublishDate { get; set; }
-        public List<string> Tags { get; set; } = new List<string>();
-        public string Category { get; set; }
-        public SEOData SEO { get; set; }
-        public Dictionary<string, object> Metadata { get; set; } = new Dictionary<string, object>();
-    }
-
-    public enum ContentType { Blog, Video, Infographic, Whitepaper, CaseStudy, Webinar }
-
-    public enum ContentStatus { Draft, InReview, Scheduled, Published, Archived }
-
-    public class ContentFilter
-    {
-        public ContentType? Type { get; set; }
-        public ContentStatus? Status { get; set; }
-        public string Category { get; set; }
-        public string AuthorId { get; set; }
-        public DateTime? PublishedFrom { get; set; }
-        public DateTime? PublishedTo { get; set; }
-    }
-
-    public class SEOData
-    {
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public List<string> Keywords { get; set; } = new List<string>();
-        public string CanonicalUrl { get; set; }
-        public Dictionary<string, string> MetaTags { get; set; } = new Dictionary<string, string>();
-    }
-
-    public class ContentCalendar
-    {
-        public DateTime StartDate { get; set; }
-        public DateTime EndDate { get; set; }
-        public List<ScheduledContent> ContentItems { get; set; } = new List<ScheduledContent>();
-    }
-
-    public class ScheduledContent
-    {
-        public string ContentId { get; set; }
-        public string Title { get; set; }
-        public DateTime PublishDate { get; set; }
-        public string Platform { get; set; }
-        public ContentStatus Status { get; set; }
-        public ContentPerformance Performance { get; set; }
-    }
-
-    public class ContentPerformance
-    {
-        public string ContentId { get; set; }
-        public int Views { get; set; }
-        public int Shares { get; set; }
-        public int Likes { get; set; }
-        public int Comments { get; set; }
-        public double EngagementRate { get; set; }
-        public int Conversions { get; set; }
-        public decimal Revenue { get; set; }
-        public DateTime MeasuredAt { get; set; }
-    }
-
-    public class ContentWorkflow
-    {
-        public string ContentId { get; set; }
-        public WorkflowStage CurrentStage { get; set; }
-        public string AssignedTo { get; set; }
-        public DateTime StageStartedAt { get; set; }
-        public List<WorkflowStep> Steps { get; set; } = new List<WorkflowStep>();
-    }
-
-    public enum WorkflowStage { Draft, Review, Approval, Scheduled, Published }
-
-    public class ContentApproval
-    {
-        public string ApprovalId { get; set; }
-        public string ContentId { get; set; }
-        public string ReviewerId { get; set; }
-        public ApprovalDecision Decision { get; set; }
-        public string Comments { get; set; }
-        public DateTime ReviewedAt { get; set; }
-    }
-
-    public enum ApprovalDecision { Approved, Rejected, RequestedChanges }
-
-    // Analytics Models
-    public class MarketingAnalytics
-    {
-        public string Period { get; set; }
-        public DateTime GeneratedAt { get; set; }
-        public CampaignAnalytics CampaignMetrics { get; set; }
-        public LeadAnalytics LeadMetrics { get; set; }
-        public ConversionAnalytics ConversionMetrics { get; set; }
-        public SocialAnalytics SocialMetrics { get; set; }
-        public ContentAnalytics ContentMetrics { get; set; }
-        public ROIMetrics ROIMetrics { get; set; }
-    }
-
-    public class ConversionMetrics
-    {
-        public string CampaignId { get; set; }
-        public int Conversions { get; set; }
-        public double ConversionRate { get; set; }
-        public decimal TotalRevenue { get; set; }
-        public decimal CostPerConversion { get; set; }
-        public DateTime Period { get; set; }
-    }
-
-    public class AttributionModel
-    {
-        public List<AttributionChannel> Channels { get; set; } = new List<AttributionChannel>();
-        public AttributionModelType Model { get; set; }
-        public DateTime LastUpdated { get; set; }
-    }
-
-    public enum AttributionModelType { FirstTouch, LastTouch, Linear, TimeDecay }
-
-    public class AttributionChannel
-    {
-        public string Channel { get; set; }
-        public double Weight { get; set; }
-        public int Conversions { get; set; }
-        public decimal Revenue { get; set; }
-    }
-
-    public class MarketingDashboard
-    {
-        public DateTime GeneratedAt { get; set; }
-        public List<DashboardWidget> Widgets { get; set; } = new List<DashboardWidget>();
-        public List<MarketingKPI> KPIs { get; set; } = new List<MarketingKPI>();
-        public List<MarketingAlert> Alerts { get; set; } = new List<MarketingAlert>();
-    }
-
-    public class DashboardWidget { }
-
-    public class MarketingKPI { }
-
-    public class MarketingAlert { }
-
-    // Lead Management Models
-    public class Lead
-    {
-        public string LeadId { get; set; }
-        public string ContactId { get; set; }
-        public string Company { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public LeadSource Source { get; set; }
-        public LeadStatus Status { get; set; }
-        public int Score { get; set; }
-        public string AssignedTo { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public Dictionary<string, object> CustomFields { get; set; } = new Dictionary<string, object>();
-    }
-
-    public enum LeadStatus { New, Contacted, Qualified, Converted, Lost, Recycled }
-
-    public enum LeadSource { Website, Email, Social, Referral, ColdCall, TradeShow }
-
-    public class LeadFilter
-    {
-        public LeadStatus? Status { get; set; }
-        public LeadSource? Source { get; set; }
-        public string AssignedTo { get; set; }
-        public DateTime? CreatedFrom { get; set; }
-        public DateTime? CreatedTo { get; set; }
-        public int? MinScore { get; set; }
-        public int? MaxScore { get; set; }
-    }
-
-    public class LeadNurturing
-    {
-        public string LeadId { get; set; }
-        public string CampaignId { get; set; }
-        public NurturingStatus Status { get; set; }
-        public DateTime StartedAt { get; set; }
-        public List<NurturingStep> Steps { get; set; } = new List<NurturingStep>();
-    }
-
-    public enum NurturingStatus { Active, Paused, Completed, Converted }
-
-    public class NurturingCampaign { }
-
-    public class NurturingStep { }
-
-    public class LeadConversion
-    {
-        public string LeadId { get; set; }
-        public string CustomerId { get; set; }
-        public string DealId { get; set; }
-        public ConversionDetails Conversion { get; set; }
-        public DateTime ConvertedAt { get; set; }
-        public decimal ConversionValue { get; set; }
-    }
-
-    public class ConversionDetails
-    {
-        public string Type { get; set; }
-        public string Description { get; set; }
-        public decimal Value { get; set; }
-        public string CampaignId { get; set; }
-    }
-
-    // Customer Segmentation Models
-    public class CustomerSegment
-    {
-        public string SegmentId { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public SegmentType Type { get; set; }
-        public List<SegmentationRule> Rules { get; set; } = new List<SegmentationRule>();
-        public int Size { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public bool IsActive { get; set; }
-    }
-
-    public enum SegmentType { Demographic, Behavioral, Geographic, Psychographic, Firmographic }
-
-    public class SegmentFilter
-    {
-        public SegmentType? Type { get; set; }
-        public bool? IsActive { get; set; }
-        public string Name { get; set; }
-    }
-
-    public class SegmentationRule
-    {
-        public string RuleId { get; set; }
-        public string Field { get; set; }
-        public string Operator { get; set; }
-        public string Value { get; set; }
-        public string Logic { get; set; }
-    }
-
-    // Marketing Automation Workflow Models
-    public class AutomationWorkflow
-    {
-        public string WorkflowId { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public WorkflowStatus Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public List<WorkflowTrigger> Triggers { get; set; } = new List<WorkflowTrigger>();
-        public List<WorkflowStep> Steps { get; set; } = new List<WorkflowStep>();
-        public Dictionary<string, object> Settings { get; set; } = new Dictionary<string, object>();
-    }
-
-    public class WorkflowTrigger
-    {
-        public string TriggerId { get; set; }
-        public TriggerType Type { get; set; }
-        public string Configuration { get; set; }
-        public bool IsActive { get; set; }
-    }
-
-    public enum TriggerType { Event, Schedule, Webhook, Manual }
-
-    public class WorkflowStep
-    {
-        public string StepId { get; set; }
-        public string Name { get; set; }
-        public StepType Type { get; set; }
-        public string Configuration { get; set; }
-        public int Order { get; set; }
-    }
-
-    public enum StepType { Action, Condition, Delay, Notification }
-
-    public class WorkflowExecution
-    {
-        public string ExecutionId { get; set; }
-        public string WorkflowId { get; set; }
-        public Dictionary<string, object> TriggerData { get; set; }
-        public ExecutionStatus Status { get; set; }
-        public DateTime StartedAt { get; set; }
-        public DateTime? CompletedAt { get; set; }
-        public List<ExecutionStep> Steps { get; set; } = new List<ExecutionStep>();
-        public string ErrorMessage { get; set; }
-    }
-
-    public enum ExecutionStatus { Running, Completed, Failed, Cancelled }
-
-    public class ExecutionStep
-    {
-        public string StepId { get; set; }
-        public ExecutionStatus Status { get; set; }
-        public DateTime StartedAt { get; set; }
-        public DateTime? CompletedAt { get; set; }
-        public Dictionary<string, object> Result { get; set; }
-        public string ErrorMessage { get; set; }
-    }
-
-    // Additional supporting models
-    public class WorkflowFilter { }
-    public class ExecutionFilter { }
-
-    // External API Response Models
-    public class HubSpotResponse
-    {
-        public List<HubSpotContact> Results { get; set; }
-    }
-
-    public class HubSpotContact
-    {
-        public string id { get; set; }
-        public HubSpotProperties properties { get; set; }
-        public DateTime createdAt { get; set; }
-        public DateTime updatedAt { get; set; }
-    }
-
-    public class HubSpotProperties
-    {
-        public string firstname { get; set; }
-        public string lastname { get; set; }
-        public string email { get; set; }
-        public string phone { get; set; }
-        public string company { get; set; }
-        public string jobtitle { get; set; }
-    }
-
-    // Additional analytics models
-    public class LeadAnalytics { }
-    public class SocialAnalytics { }
-    public class ContentAnalytics { }
-    public class ROIMetrics
-    {
-        public decimal TotalInvestment { get; set; }
-        public decimal TotalRevenue { get; set; }
-        public decimal ROI { get; set; }
-        public decimal CustomerAcquisitionCost { get; set; }
-        public decimal CustomerLifetimeValue { get; set; }
-    }
-
-    public class ROIAnalysis
-    {
-        public TimeSpan Period { get; set; }
-        public DateTime GeneratedAt { get; set; }
-        public decimal TotalInvestment { get; set; }
-        public decimal TotalRevenue { get; set; }
-        public decimal CustomerAcquisitionCost { get; set; }
-        public decimal CustomerLifetimeValue { get; set; }
-        public double ConversionRate { get; set; }
-        public decimal ROI { get; set; }
-        public BreakEvenPoint BreakEvenPoint { get; set; }
-    }
-
-    public class BreakEvenPoint
-    {
-        public decimal Investment { get; set; }
-        public int CustomersNeeded { get; set; }
-        public DateTime EstimatedDate { get; set; }
-    }
-
-    public class CustomerJourneyAnalytics { }
-
-    #endregion
 }
+

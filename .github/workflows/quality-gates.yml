@@ -1,0 +1,65 @@
+name: quality-gates
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+
+jobs:
+  backend-build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore HelpDeskSystem.slnx
+
+      - name: Build
+        run: dotnet build HelpDeskSystem.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test HelpDeskSystem.slnx --configuration Release --no-build --verbosity normal
+
+      - name: Verify critical modules are compiled
+        shell: bash
+        run: |
+          if grep -q 'Compile Remove="Services\\AdvancedSamlService.cs"' HelpDeskSystem.API/HelpDeskSystem.API.csproj; then
+            echo "AdvancedSamlService is excluded from compile" >&2
+            exit 1
+          fi
+          if grep -q 'Compile Remove="IWorkflowEngine.cs"' HelpDeskSystem.Workflow/HelpDeskSystem.Workflow.csproj; then
+            echo "Visual workflow interface is excluded from compile" >&2
+            exit 1
+          fi
+          if grep -q 'Compile Remove="Services\\VisualWorkflowEngine.cs"' HelpDeskSystem.Workflow/HelpDeskSystem.Workflow.csproj; then
+            echo "VisualWorkflowEngine is excluded from compile" >&2
+            exit 1
+          fi
+
+  web-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: HelpDeskSystem.Web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: HelpDeskSystem.Web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web
+        run: npm run build

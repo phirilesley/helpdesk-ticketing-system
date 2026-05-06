@@ -86,3 +86,28 @@ public enum DsrProcessStage
     Fulfillment = 4,
     Closed = 5
 }
+
+public enum OutboundMessageStatus
+{
+    Pending = 1,
+    Sending = 2,
+    Delivered = 3,
+    Failed = 4,
+    Retrying = 5,
+    Cancelled = 6
+}
+
+public enum DeliveryReceiptStatus
+{
+    Accepted = 1,
+    Sent = 2,
+    Delivered = 3,
+    Read = 4,
+    Failed = 5
+}
+
+public enum TenantFailoverMode
+{
+    Manual = 1,
+    Automatic = 2
+}

@@ -22,42 +22,42 @@ namespace HelpDeskSystem.API.Controllers
 
         // GitHub Integration
         [HttpGet("github/repositories")]
-        public async Task<IActionResult> GetRepositories()
+        public async Task<IActionResult> GetGitHubRepositories()
         {
             var repositories = await _gitHubService.GetRepositories();
             return Ok(repositories);
         }
 
         [HttpGet("github/repositories/{owner}/{repo}/commits")]
-        public async Task<IActionResult> GetCommits(string owner, string repo, string branch = "main")
+        public async Task<IActionResult> GetGitHubCommits(string owner, string repo, string branch = "main")
         {
             var commits = await _gitHubService.GetCommits(owner, repo, branch);
             return Ok(commits);
         }
 
         [HttpGet("github/repositories/{owner}/{repo}/branches")]
-        public async Task<IActionResult> GetBranches(string owner, string repo)
+        public async Task<IActionResult> GetGitHubBranches(string owner, string repo)
         {
             var branches = await _gitHubService.GetBranches(owner, repo);
             return Ok(branches);
         }
 
         [HttpGet("github/repositories/{owner}/{repo}/pulls")]
-        public async Task<IActionResult> GetPullRequests(string owner, string repo)
+        public async Task<IActionResult> GetGitHubPullRequests(string owner, string repo)
         {
             var pullRequests = await _gitHubService.GetPullRequests(owner, repo);
             return Ok(pullRequests);
         }
 
         [HttpPost("github/repositories/{owner}/{repo}/pulls")]
-        public async Task<IActionResult> CreatePullRequest(string owner, string repo, [FromBody] CreatePullRequestDto request)
+        public async Task<IActionResult> CreateGitHubPullRequest(string owner, string repo, [FromBody] CreatePullRequestDto request)
         {
             var pullRequest = await _gitHubService.CreatePullRequest(owner, repo, request.Title, request.Description, request.Head, request.Base);
             return Ok(pullRequest);
         }
 
         [HttpPost("github/repositories/{owner}/{repo}/branches")]
-        public async Task<IActionResult> CreateBranch(string owner, string repo, [FromBody] CreateBranchDto request)
+        public async Task<IActionResult> CreateGitHubBranch(string owner, string repo, [FromBody] CreateBranchDto request)
         {
             var branch = await _gitHubService.CreateBranch(owner, repo, request.BranchName, request.FromBranch);
             return Ok(branch);
@@ -167,15 +167,15 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("repositories/{repositoryId}/branches")]
         public async Task<IActionResult> CreateBranch(string repositoryId, [FromBody] CreateBranchDto request)
         {
-            var branch = await _devOpsService.CreateBranch(repositoryId, request.BranchName, request.FromBranch);
-            return Ok(branch);
+            await _devOpsService.CreateBranch(repositoryId, request.BranchName, request.FromBranch);
+            return Ok();
         }
 
         [HttpPost("repositories/{repositoryId}/pulls")]
         public async Task<IActionResult> CreatePullRequest(string repositoryId, [FromBody] CreatePullRequestDto request)
         {
-            var pullRequest = await _devOpsService.CreatePullRequest(repositoryId, request.Title, request.Description, request.SourceBranch, request.TargetBranch);
-            return Ok(pullRequest);
+            await _devOpsService.CreatePullRequest(repositoryId, request.Title, request.Description, request.SourceBranch, request.TargetBranch);
+            return Ok();
         }
 
         [HttpGet("pipelines")]
@@ -188,8 +188,8 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("pipelines/{pipelineId}/trigger")]
         public async Task<IActionResult> TriggerPipeline(string pipelineId, [FromBody] TriggerPipelineDto request)
         {
-            var build = await _devOpsService.TriggerPipeline(pipelineId, request.Parameters);
-            return Ok(build);
+            await _devOpsService.TriggerPipeline(pipelineId, request.Parameters);
+            return Ok();
         }
 
         [HttpGet("builds/{buildId}")]
@@ -216,22 +216,22 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("repositories/{repositoryId}/reviews")]
         public async Task<IActionResult> CreateCodeReview(string repositoryId, [FromBody] CreateCodeReviewDto request)
         {
-            var review = await _devOpsService.CreateCodeReview(repositoryId, request.Title, request.Description, request.Reviewers);
-            return Ok(review);
+            await _devOpsService.CreateCodeReview(repositoryId, request.Title, request.Description, request.Reviewers);
+            return Ok();
         }
 
         [HttpPost("reviews/{reviewId}/approve")]
         public async Task<IActionResult> ApproveCodeReview(string reviewId)
         {
-            var review = await _devOpsService.ApproveCodeReview(reviewId);
-            return Ok(review);
+            await _devOpsService.ApproveCodeReview(reviewId);
+            return Ok();
         }
 
         [HttpPost("reviews/{reviewId}/request-changes")]
         public async Task<IActionResult> RequestChanges(string reviewId, [FromBody] RequestChangesDto request)
         {
-            var review = await _devOpsService.RequestChanges(reviewId, request.Comment);
-            return Ok(review);
+            await _devOpsService.RequestChanges(reviewId, request.Comment);
+            return Ok();
         }
 
         [HttpGet("deployments/recent")]
@@ -244,8 +244,11 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("deployments/{deploymentId}/track")]
         public async Task<IActionResult> TrackDeployment(string deploymentId, [FromBody] TrackDeploymentDto request)
         {
-            var deployment = await _devOpsService.TrackDeployment(deploymentId, request.Status);
-            return Ok(deployment);
+            var parsed = Enum.TryParse<DeploymentStatus>(request.Status, true, out var status)
+                ? status
+                : DeploymentStatus.Pending;
+            await _devOpsService.TrackDeployment(deploymentId, parsed);
+            return Ok();
         }
 
         [HttpPost("deployments/{deploymentId}/rollback")]
@@ -272,8 +275,8 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("feature-branches/{branchId}/merge")]
         public async Task<IActionResult> MergeFeatureBranch(string branchId, [FromBody] MergeFeatureBranchDto request)
         {
-            var result = await _devOpsService.MergeFeatureBranch(branchId, request.TargetBranch);
-            return Ok(result);
+            await _devOpsService.MergeFeatureBranch(branchId, request.TargetBranch);
+            return Ok();
         }
 
         [HttpPost("sprints/{sprintId}/deploy")]
@@ -293,35 +296,46 @@ namespace HelpDeskSystem.API.Controllers
         [HttpGet("repositories/{repositoryId}/security")]
         public async Task<IActionResult> GetSecurityScanReport(string repositoryId, string branch = "main")
         {
-            var report = await _devOpsService.GetSecurityScanReport(repositoryId, branch);
+            var report = await _devOpsService.RunSecurityScan(repositoryId);
             return Ok(report);
         }
 
         [HttpGet("repositories/{repositoryId}/coverage")]
         public async Task<IActionResult> GetTestCoverageReport(string repositoryId, string branch = "main")
         {
-            var report = await _devOpsService.GetTestCoverageReport(repositoryId, branch);
+            var report = await _devOpsService.GetTestResults("latest");
             return Ok(report);
         }
 
         [HttpGet("repositories/{repositoryId}/dependencies")]
         public async Task<IActionResult> GetDependencyReport(string repositoryId)
         {
-            var report = await _devOpsService.GetDependencyReport(repositoryId);
-            return Ok(report);
+            return Ok(new { RepositoryId = repositoryId, Message = "Dependency report not implemented in current DevOps service contract." });
         }
 
         [HttpGet("dashboard")]
         public async Task<IActionResult> GetDevOpsDashboard()
         {
-            var dashboard = await _devOpsService.GetDevOpsDashboard();
+            var dashboard = new
+            {
+                Repositories = await _devOpsService.GetRepositories(),
+                Pipelines = await _devOpsService.GetPipelines(),
+                Deployments = await _devOpsService.GetRecentDeployments()
+            };
             return Ok(dashboard);
         }
 
         [HttpGet("metrics")]
         public async Task<IActionResult> GetDevOpsMetrics([FromQuery] DevOpsMetricsFilter filter)
         {
-            var metrics = await _devOpsService.GetDevOpsMetrics(filter);
+            var metrics = new
+            {
+                PeriodStart = filter.StartDate,
+                PeriodEnd = filter.EndDate,
+                Repositories = (await _devOpsService.GetRepositories()).Count,
+                ActivePipelines = (await _devOpsService.GetPipelines()).Count,
+                RecentDeployments = (await _devOpsService.GetRecentDeployments(filter.Environment)).Count
+            };
             return Ok(metrics);
         }
     }

@@ -1,4 +1,4 @@
-namespace HelpDeskSystem.Workflow.Models;
+namespace HelpDeskSystem.Workflow.Visual.Models;
 
 public class WorkflowDefinition
 {

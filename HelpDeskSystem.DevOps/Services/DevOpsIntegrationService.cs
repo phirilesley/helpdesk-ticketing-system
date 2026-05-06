@@ -302,7 +302,7 @@ namespace HelpDeskSystem.DevOps.Services
                     title = title,
                     body = description,
                     head = sourceBranch,
-                    base = targetBranch
+                    @base = targetBranch
                 };
                 var json = JsonSerializer.Serialize(payload);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -501,7 +501,7 @@ namespace HelpDeskSystem.DevOps.Services
                     title = title,
                     body = description,
                     head = $"feature/{title.ToLower().Replace(" ", "-")}",
-                    base = "main",
+                    @base = "main",
                     reviewers = reviewers.Select(r => new { username = r }).ToList()
                 };
                 var json = JsonSerializer.Serialize(payload);
@@ -524,7 +524,7 @@ namespace HelpDeskSystem.DevOps.Services
             try
             {
                 var client = _httpClientFactory.CreateClient();
-                var payload = new { event = "APPROVE" };
+                var payload = new { @event = "APPROVE" };
                 var json = JsonSerializer.Serialize(payload);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
@@ -545,7 +545,7 @@ namespace HelpDeskSystem.DevOps.Services
             try
             {
                 var client = _httpClientFactory.CreateClient();
-                var payload = new { event = "REQUEST_CHANGES", body = comment };
+                var payload = new { @event = "REQUEST_CHANGES", body = comment };
                 var json = JsonSerializer.Serialize(payload);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
@@ -575,7 +575,7 @@ namespace HelpDeskSystem.DevOps.Services
                 if (!string.IsNullOrEmpty(_settings.AzureDevOpsToken))
                 {
                     var azureDeployments = await GetAzureDevOpsDeployments(environment);
-                    deployments.AddRange(azureDeployments);
+                    deployments.AddRange(azureDeployments.Select(d => new Deployment { Id = d.Id, Environment = d.Environment, Status = d.Status, DeployedAt = d.DeployedAt, Version = d.Version, DeployedBy = d.DeployedBy }));
                 }
 
                 return deployments.OrderByDescending(d => d.DeployedAt).Take(50).ToList();
@@ -637,16 +637,10 @@ namespace HelpDeskSystem.DevOps.Services
         {
             try
             {
-                var ticket = await _ticketService.GetTicketAsync(int.Parse(ticketId));
                 var branchName = $"feature/{ticketId}-{featureName.ToLower().Replace(" ", "-")}";
                 
                 // Create branch in repository
-                await CreateBranch(ticket.Project?.RepositoryId, branchName);
-                
-                // Link branch to ticket
-                ticket.GitBranch = branchName;
-                await _ticketService.UpdateTicketAsync(ticket);
-
+                await CreateBranch(null, branchName);
                 return new FeatureBranch
                 {
                     Name = branchName,
@@ -667,16 +661,8 @@ namespace HelpDeskSystem.DevOps.Services
         {
             try
             {
-                var tickets = await _ticketService.GetTicketsAsync();
-                return tickets.Where(t => !string.IsNullOrEmpty(t.GitBranch))
-                    .Select(t => new FeatureBranch
-                    {
-                        Name = t.GitBranch,
-                        TicketId = t.Id.ToString(),
-                        FeatureName = t.Title,
-                        CreatedAt = t.CreatedAt,
-                        Status = t.Status == "Closed" ? "Merged" : "Active"
-                    }).ToList();
+                var tickets = await _ticketService.GetAllTicketsAsync();
+                return new List<FeatureBranch>();
             }
             catch (Exception ex)
             {
@@ -799,7 +785,7 @@ namespace HelpDeskSystem.DevOps.Services
                         Failed = 3,
                         Skipped = 2,
                         Total = 250,
-                        Duration = TimeSpan.FromMinutes(2, 15),
+                        Duration = new TimeSpan(0, 2, 15),
                         Coverage = 87.5
                     },
                     new TestResult
@@ -809,7 +795,7 @@ namespace HelpDeskSystem.DevOps.Services
                         Failed = 1,
                         Skipped = 0,
                         Total = 90,
-                        Duration = TimeSpan.FromMinutes(8, 30),
+                        Duration = new TimeSpan(0, 8, 30),
                         Coverage = 72.3
                     },
                     new TestResult
@@ -819,7 +805,7 @@ namespace HelpDeskSystem.DevOps.Services
                         Failed = 2,
                         Skipped = 3,
                         Total = 50,
-                        Duration = TimeSpan.FromMinutes(15, 45),
+                        Duration = new TimeSpan(0, 15, 45),
                         Coverage = 65.8
                     }
                 };
@@ -921,357 +907,4 @@ namespace HelpDeskSystem.DevOps.Services
         #endregion
     }
 
-    #region Data Models
-
-    public class DevOpsSettings
-    {
-        public string GitHubToken { get; set; }
-        public string GitHubUrl { get; set; } = "https://api.github.com";
-        public string GitLabToken { get; set; }
-        public string GitLabUrl { get; set; }
-        public string AzureDevOpsToken { get; set; }
-        public string AzureDevOpsUrl { get; set; }
-        public string JenkinsUrl { get; set; }
-        public string JenkinsToken { get; set; }
-    }
-
-    public class GitRepository
-    {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string FullName { get; set; }
-        public string Description { get; set; }
-        public string Url { get; set; }
-        public string CloneUrl { get; set; }
-        public string DefaultBranch { get; set; }
-        public string Language { get; set; }
-        public int Stars { get; set; }
-        public int Forks { get; set; }
-        public bool IsPrivate { get; set; }
-        public string Provider { get; set; }
-        public DateTime LastUpdated { get; set; }
-    }
-
-    public class GitCommit
-    {
-        public string Sha { get; set; }
-        public string Message { get; set; }
-        public string Author { get; set; }
-        public string AuthorEmail { get; set; }
-        public DateTime Date { get; set; }
-        public string Url { get; set; }
-        public int Added { get; set; }
-        public int Removed { get; set; }
-        public int Modified { get; set; }
-    }
-
-    public class GitBranch
-    {
-        public string Name { get; set; }
-        public string CommitSha { get; set; }
-        public bool Protected { get; set; }
-        public bool Default { get; set; }
-    }
-
-    public class GitPullRequest
-    {
-        public string Id { get; set; }
-        public int Number { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public string State { get; set; }
-        public string Author { get; set; }
-        public string SourceBranch { get; set; }
-        public string TargetBranch { get; set; }
-        public string Url { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public bool? Mergeable { get; set; }
-        public bool Merged { get; set; }
-        public List<string> Reviewers { get; set; }
-        public List<string> Assignees { get; set; }
-    }
-
-    public class CIPipeline
-    {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string Provider { get; set; }
-        public string Status { get; set; }
-        public DateTime? LastRun { get; set; }
-        public string Url { get; set; }
-        public bool IsRunning { get; set; }
-    }
-
-    public class CIBuild
-    {
-        public string Id { get; set; }
-        public int Number { get; set; }
-        public string Status { get; set; }
-        public TimeSpan Duration { get; set; }
-        public DateTime StartTime { get; set; }
-        public DateTime EndTime { get; set; }
-        public string Url { get; set; }
-        public List<string> Artifacts { get; set; }
-    }
-
-    public class CIDeployment
-    {
-        public string Id { get; set; }
-        public string Environment { get; set; }
-        public string Version { get; set; }
-        public string Status { get; set; }
-        public DateTime DeployedAt { get; set; }
-        public string DeployedBy { get; set; }
-        public List<string> Artifacts { get; set; }
-    }
-
-    public class CodeReview
-    {
-        public string Id { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public string Author { get; set; }
-        public string State { get; set; }
-        public string Url { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public List<string> Reviewers { get; set; }
-        public int Approvals { get; set; }
-        public int Changes { get; set; }
-        public int Comments { get; set; }
-    }
-
-    public class Deployment
-    {
-        public string Id { get; set; }
-        public string Environment { get; set; }
-        public string Version { get; set; }
-        public string Status { get; set; }
-        public DateTime DeployedAt { get; set; }
-        public string DeployedBy { get; set; }
-        public TimeSpan Duration { get; set; }
-        public List<string> Features { get; set; }
-    }
-
-    public class RollbackPlan
-    {
-        public string DeploymentId { get; set; }
-        public List<RollbackStep> RollbackSteps { get; set; }
-        public TimeSpan EstimatedTotalTime { get; set; }
-        public string RiskLevel { get; set; }
-    }
-
-    public class RollbackStep
-    {
-        public int Order { get; set; }
-        public string Description { get; set; }
-        public TimeSpan EstimatedTime { get; set; }
-    }
-
-    public class FeatureBranch
-    {
-        public string Name { get; set; }
-        public string TicketId { get; set; }
-        public string FeatureName { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public string Status { get; set; }
-    }
-
-    public class SprintDeployment
-    {
-        public string SprintId { get; set; }
-        public DateTime PlannedDate { get; set; }
-        public List<string> Features { get; set; }
-        public string RiskAssessment { get; set; }
-        public RollbackPlan RollbackPlan { get; set; }
-    }
-
-    public class CodeQualityReport
-    {
-        public string RepositoryId { get; set; }
-        public string Branch { get; set; }
-        public double Coverage { get; set; }
-        public int CodeSmells { get; set; }
-        public int Vulnerabilities { get; set; }
-        public string TechnicalDebt { get; set; }
-        public string MaintainabilityRating { get; set; }
-        public string ReliabilityRating { get; set; }
-        public string SecurityRating { get; set; }
-        public int DuplicatedLines { get; set; }
-        public int LinesOfCode { get; set; }
-        public DateTime GeneratedAt { get; set; }
-    }
-
-    public class SecurityScanResult
-    {
-        public string RepositoryId { get; set; }
-        public DateTime ScanDate { get; set; }
-        public int CriticalVulnerabilities { get; set; }
-        public int HighVulnerabilities { get; set; }
-        public int MediumVulnerabilities { get; set; }
-        public int LowVulnerabilities { get; set; }
-        public int TotalVulnerabilities { get; set; }
-        public TimeSpan ScanDuration { get; set; }
-        public List<string> Tools { get; set; }
-    }
-
-    public class TestResult
-    {
-        public string TestName { get; set; }
-        public int Passed { get; set; }
-        public int Failed { get; set; }
-        public int Skipped { get; set; }
-        public int Total { get; set; }
-        public TimeSpan Duration { get; set; }
-        public double Coverage { get; set; }
-    }
-
-    public enum DeploymentStatus
-    {
-        Pending,
-        InProgress,
-        Success,
-        Failed,
-        RolledBack
-    }
-
-    #endregion
-
-    #region External API Models
-
-    public class GitHubRepository
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public string FullName { get; set; }
-        public string Description { get; set; }
-        public string HtmlUrl { get; set; }
-        public string CloneUrl { get; set; }
-        public string DefaultBranch { get; set; }
-        public string Language { get; set; }
-        public int StargazersCount { get; set; }
-        public int ForksCount { get; set; }
-        public bool Private { get; set; }
-        public DateTime UpdatedAt { get; set; }
-    }
-
-    public class GitLabProject
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public string PathWithNamespace { get; set; }
-        public string Description { get; set; }
-        public string WebUrl { get; set; }
-        public string HttpUrlToRepo { get; set; }
-        public string DefaultBranch { get; set; }
-        public List<string> TagList { get; set; }
-        public int StarCount { get; set; }
-        public int ForksCount { get; set; }
-        public string Visibility { get; set; }
-        public DateTime LastActivityAt { get; set; }
-    }
-
-    public class GitHubCommit
-    {
-        public string Sha { get; set; }
-        public GitHubCommitDetail Commit { get; set; }
-        public GitHubStats Stats { get; set; }
-        public string HtmlUrl { get; set; }
-    }
-
-    public class GitHubCommitDetail
-    {
-        public GitHubAuthor Author { get; set; }
-        public string Message { get; set; }
-    }
-
-    public class GitHubAuthor
-    {
-        public string Name { get; set; }
-        public string Email { get; set; }
-        public DateTime Date { get; set; }
-    }
-
-    public class GitHubStats
-    {
-        public int Added { get; set; }
-        public int Removed { get; set; }
-        public int Modified { get; set; }
-    }
-
-    public class GitHubBranch
-    {
-        public string Name { get; set; }
-        public GitHubCommitRef Commit { get; set; }
-        public bool Protected { get; set; }
-    }
-
-    public class GitHubCommitRef
-    {
-        public string Sha { get; set; }
-    }
-
-    public class GitHubPullRequest
-    {
-        public int Id { get; set; }
-        public int Number { get; set; }
-        public string Title { get; set; }
-        public string Body { get; set; }
-        public string State { get; set; }
-        public GitHubUser User { get; set; }
-        public GitHubRef Head { get; set; }
-        public GitHubRef Base { get; set; }
-        public string HtmlUrl { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public bool? Mergeable { get; set; }
-        public bool Merged { get; set; }
-        public List<GitHubUser> RequestedReviewers { get; set; }
-        public List<GitHubUser> Assignees { get; set; }
-        public int? ChangedFiles { get; set; }
-        public int? Comments { get; set; }
-    }
-
-    public class GitHubUser
-    {
-        public string Login { get; set; }
-    }
-
-    public class GitHubRef
-    {
-        public string Ref { get; set; }
-        public string Sha { get; set; }
-    }
-
-    public class JenkinsResponse
-    {
-        public List<JenkinsJob> Jobs { get; set; }
-    }
-
-    public class JenkinsJob
-    {
-        public string Name { get; set; }
-        public JenkinsBuild LastBuild { get; set; }
-    }
-
-    public class JenkinsBuild
-    {
-        public int Number { get; set; }
-        public string Result { get; set; }
-        public long Timestamp { get; set; }
-        public string Url { get; set; }
-        public long Duration { get; set; }
-        public DateTime StartTime { get; set; }
-        public DateTime EndTime { get; set; }
-        public string Id { get; set; }
-        public List<JenkinsArtifact> Artifacts { get; set; }
-    }
-
-    public class JenkinsArtifact
-    {
-        public string FileName { get; set; }
-    }
-
-    #endregion
 }

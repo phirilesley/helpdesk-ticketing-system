@@ -147,7 +147,7 @@ namespace HelpDeskSystem.API.Controllers
         }
 
         [HttpGet("database/metrics")]
-        public async Task<IActionResult> GetDatabaseMetrics()
+        public async Task<IActionResult> GetInfrastructureDatabaseMetrics()
         {
             var metrics = await _scalabilityService.GetDatabaseMetrics();
             return Ok(metrics);
@@ -386,16 +386,28 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("auto-scaling/execute")]
         public async Task<IActionResult> ExecuteScalingAction([FromBody] ScalingDecisionDto request)
         {
+            var mappedActions = request.RecommendedActions.Select(a =>
+            {
+                var parsedType = Enum.TryParse<ScalingActionType>(a, true, out var t) ? t : ScalingActionType.ScaleOut;
+                return new ScalingAction
+                {
+                    ActionId = Guid.NewGuid().ToString(),
+                    Type = parsedType,
+                    Details = a,
+                    Status = ScalingStatus.Pending
+                };
+            }).ToList();
+
             var decision = new ScalingDecision
             {
-                RecommendedActions = request.RecommendedActions
+                RecommendedActions = mappedActions
             };
             var result = await _autoScalingService.ExecuteScalingAction(decision);
             return Ok(result);
         }
 
-        [HttpGet("auto-scaling/history")]
-        public async Task<IActionResult> GetScalingHistory()
+        [HttpGet("infrastructure/auto-scaling/history")]
+        public async Task<IActionResult> GetInfrastructureScalingHistory()
         {
             var history = await _autoScalingService.GetScalingHistory();
             return Ok(history);
@@ -412,11 +424,14 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("containers/scale")]
         public async Task<IActionResult> ScaleContainers([FromBody] ContainerScalingDto request)
         {
+            var parsed = Enum.TryParse<ScalingStrategy>(request.Strategy, true, out var strategy)
+                ? strategy
+                : ScalingStrategy.Rolling;
             var scaling = new ContainerScaling
             {
                 ServiceName = request.ServiceName,
                 Replicas = request.Replicas,
-                Strategy = request.Strategy
+                Strategy = parsed
             };
             var result = await _autoScalingService.ScaleContainers(scaling);
             return Ok(result);
@@ -440,10 +455,18 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("cloud/scale")]
         public async Task<IActionResult> ScaleCloudResources([FromBody] CloudScalingDto request)
         {
+            var parsed = Enum.TryParse<ScalingActionType>(request.Action, true, out var actionType)
+                ? actionType
+                : ScalingActionType.ScaleOut;
             var scaling = new CloudScaling
             {
                 Provider = request.Provider,
-                Action = request.Action,
+                Action = new ScalingAction
+                {
+                    ActionId = Guid.NewGuid().ToString(),
+                    Type = parsed,
+                    Status = ScalingStatus.Pending
+                },
                 ResourceType = request.ResourceType,
                 TargetCount = request.TargetCount,
                 InstanceType = request.InstanceType,
@@ -464,12 +487,15 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("performance/alerts")]
         public async Task<IActionResult> CreatePerformanceAlert([FromBody] PerformanceAlertDto request)
         {
+            var parsed = Enum.TryParse<AlertSeverity>(request.Severity, true, out var severity)
+                ? severity
+                : AlertSeverity.Warning;
             var alert = new PerformanceAlert
             {
                 Metric = request.Metric,
                 CurrentValue = request.CurrentValue,
                 Threshold = request.Threshold,
-                Severity = request.Severity,
+                Severity = parsed,
                 Description = request.Description,
                 ResourceId = request.ResourceId,
                 AutoRemediationEnabled = request.AutoRemediationEnabled,
@@ -480,13 +506,13 @@ namespace HelpDeskSystem.API.Controllers
         }
 
         [HttpGet("performance/alerts/active")]
-        public async Task<IActionResult> GetActiveAlerts()
+        public async Task<IActionResult> GetInfrastructureActiveAlerts()
         {
             var alerts = await _autoScalingService.GetActiveAlerts();
             return Ok(alerts);
         }
 
-        [HttpPost("performance/baseline")]
+        [HttpPost("performance/infrastructure-baseline")]
         public async Task<IActionResult> EstablishBaseline()
         {
             var baseline = await _autoScalingService.EstablishBaseline();
@@ -494,7 +520,7 @@ namespace HelpDeskSystem.API.Controllers
         }
 
         [HttpPost("performance/report")]
-        public async Task<IActionResult> GeneratePerformanceReport([FromBody] PerformanceReportDto request)
+        public async Task<IActionResult> GeneratePerformanceReport([FromBody] PerformanceReportRequestDto request)
         {
             var report = await _autoScalingService.GeneratePerformanceReport();
             return Ok(report);
@@ -509,7 +535,7 @@ namespace HelpDeskSystem.API.Controllers
         }
 
         [HttpGet("capacity/utilization")]
-        public async Task<IActionResult> GetResourceUtilization()
+        public async Task<IActionResult> GetCapacityResourceUtilization()
         {
             var utilization = await _autoScalingService.GetResourceUtilization();
             return Ok(utilization);
@@ -525,12 +551,26 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("capacity/plan")]
         public async Task<IActionResult> CreateCapacityPlan([FromBody] CapacityPlanDto request)
         {
+            var targets = request.Targets.Select(kvp => new CapacityTarget
+            {
+                ResourceType = kvp.Key,
+                TargetUtilization = kvp.Value,
+                TargetDate = DateTime.UtcNow.Add(request.Horizon)
+            }).ToList();
+            var actions = request.Actions.Select(a => new CapacityAction
+            {
+                Action = a,
+                ScheduledDate = DateTime.UtcNow.AddDays(1),
+                ResourceType = "generic",
+                Quantity = 1
+            }).ToList();
+
             var plan = new CapacityPlan
             {
                 Name = request.Name,
                 Horizon = request.Horizon,
-                Targets = request.Targets,
-                Actions = request.Actions
+                Targets = targets,
+                Actions = actions
             };
             var result = await _autoScalingService.CreateCapacityPlan(plan);
             return Ok(result);
@@ -554,11 +594,14 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("health/incident")]
         public async Task<IActionResult> TriggerIncidentResponse([FromBody] IncidentDto request)
         {
+            var parsed = Enum.TryParse<IncidentSeverity>(request.Severity, true, out var severity)
+                ? severity
+                : IncidentSeverity.Critical;
             var incident = new Incident
             {
                 Title = request.Title,
                 Description = request.Description,
-                Severity = request.Severity,
+                Severity = parsed,
                 Component = request.Component,
                 AffectedResources = request.AffectedResources
             };
@@ -569,10 +612,13 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("health/recovery")]
         public async Task<IActionResult> ExecuteRecoveryAction([FromBody] RecoveryActionDto request)
         {
+            var parsed = Enum.TryParse<RecoveryType>(request.Type, true, out var type)
+                ? type
+                : RecoveryType.Restart;
             var action = new RecoveryAction
             {
                 Action = request.Action,
-                Type = request.Type
+                Type = parsed
             };
             var result = await _autoScalingService.ExecuteRecoveryAction(action);
             return Ok(result);

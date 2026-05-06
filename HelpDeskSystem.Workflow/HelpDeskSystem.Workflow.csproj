@@ -12,4 +12,7 @@
     <ProjectReference Include="..\HelpDeskSystem.Application\HelpDeskSystem.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+  </ItemGroup>
+
 </Project>

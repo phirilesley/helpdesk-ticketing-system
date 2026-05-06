@@ -1,4 +1,5 @@
 using System.Text.Json;
+using HelpDeskSystem.API.Services;
 using HelpDeskSystem.API.Security;
 using HelpDeskSystem.Domain.Entities;
 using HelpDeskSystem.Persistence.Context;
@@ -14,10 +15,12 @@ namespace HelpDeskSystem.API.Controllers;
 public class WorkflowBuilderController : ControllerBase
 {
     private readonly HelpDeskDbContext _context;
+    private readonly IVisualWorkflowRuntimeService _runtimeService;
 
-    public WorkflowBuilderController(HelpDeskDbContext context)
+    public WorkflowBuilderController(HelpDeskDbContext context, IVisualWorkflowRuntimeService runtimeService)
     {
         _context = context;
+        _runtimeService = runtimeService;
     }
 
     [HttpGet("definitions")]
@@ -75,6 +78,20 @@ public class WorkflowBuilderController : ControllerBase
     public ActionResult<WorkflowGraphValidationResult> Validate([FromBody] ValidateWorkflowGraphRequest request)
     {
         return Ok(ValidateGraph(request.GraphJson));
+    }
+
+    [HttpPost("execute/{definitionId:int}")]
+    [Authorize(Roles = "Admin,SuperAdmin,Agent")]
+    public async Task<ActionResult<VisualWorkflowRunResult>> ExecuteVisualWorkflow(
+        int definitionId,
+        [FromBody] ExecuteWorkflowDefinitionRequest request)
+    {
+        var userId = User.GetUserId() ?? 0;
+        var execution = await _runtimeService.ExecuteAsync(definitionId, request.TicketId, userId, request.DryRun, HttpContext.RequestAborted);
+        if (!execution.Success)
+            return BadRequest(execution);
+
+        return Ok(execution);
     }
 
     private WorkflowGraphValidationResult ValidateGraph(string graphJson)
@@ -218,6 +235,12 @@ public class UpsertWorkflowDefinitionRequest
 public class ValidateWorkflowGraphRequest
 {
     public string GraphJson { get; set; } = "{\"nodes\":[],\"edges\":[]}";
+}
+
+public class ExecuteWorkflowDefinitionRequest
+{
+    public int TicketId { get; set; }
+    public bool DryRun { get; set; }
 }
 
 public class WorkflowGraphValidationResult

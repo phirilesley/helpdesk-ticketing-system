@@ -66,10 +66,26 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <Box sx={{ flexGrow: 1, p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Customer Dashboard
-      </Typography>
+    <Box sx={{ flexGrow: 1, p: 1 }}>
+      <Paper sx={{ p: { xs: 2.2, md: 3.2 }, mb: 3, borderRadius: 4, border: '1px solid #dbeafe', background: 'linear-gradient(135deg,#ecfeff 0%,#eff6ff 70%,#f8fafc 100%)' }}>
+        <Typography variant="h4" gutterBottom>
+          Operations Dashboard
+        </Typography>
+        <Typography sx={{ color: '#475569', mb: 1.6 }}>
+          Monitor support performance, then jump into customer portal, ticket queues, or knowledge management.
+        </Typography>
+        <Box display="flex" gap={1.2} flexWrap="wrap">
+          <Button component={Link} to="/app/customer-portal" variant="contained" sx={{ textTransform: 'none', fontWeight: 700 }}>
+            Customer Portal
+          </Button>
+          <Button component={Link} to="/app/tickets/create" variant="outlined" sx={{ textTransform: 'none', fontWeight: 700 }}>
+            Log Complaint
+          </Button>
+          <Button component={Link} to="/app/knowledge-base" variant="outlined" sx={{ textTransform: 'none', fontWeight: 700 }}>
+            Knowledge Base
+          </Button>
+        </Box>
+      </Paper>
 
       <Grid container spacing={3}>
         {/* Stats Cards */}
@@ -130,7 +146,7 @@ const Dashboard: React.FC = () => {
           <Paper sx={{ p: 2 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6">Recent Tickets</Typography>
-              <Button component={Link} to="/tickets/create" variant="contained">
+              <Button component={Link} to="/app/tickets/create" variant="contained">
                 Create New Ticket
               </Button>
             </Box>
@@ -145,7 +161,7 @@ const Dashboard: React.FC = () => {
                   <ListItem
                     key={ticket.id}
                     component={Link}
-                    to={`/tickets/${ticket.id}`}
+                    to={`/app/tickets/${ticket.id}`}
                     sx={{ textDecoration: 'none', color: 'inherit' }}
                   >
                     <ListItemText
@@ -184,7 +200,7 @@ const Dashboard: React.FC = () => {
             <Box display="flex" flexDirection="column" gap={2}>
               <Button
                 component={Link}
-                to="/tickets/create"
+                to="/app/tickets/create"
                 variant="contained"
                 fullWidth
               >
@@ -192,7 +208,7 @@ const Dashboard: React.FC = () => {
               </Button>
               <Button
                 component={Link}
-                to="/tickets"
+                to="/app/tickets"
                 variant="outlined"
                 fullWidth
               >

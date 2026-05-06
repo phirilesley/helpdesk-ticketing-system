@@ -22,6 +22,10 @@ COPY ["HelpDeskSystem.Realtime/HelpDeskSystem.Realtime.csproj", "HelpDeskSystem.
 COPY ["HelpDeskSystem.Reporting/HelpDeskSystem.Reporting.csproj", "HelpDeskSystem.Reporting/"]
 COPY ["HelpDeskSystem.SLA/HelpDeskSystem.SLA.csproj", "HelpDeskSystem.SLA/"]
 COPY ["HelpDeskSystem.Workflow/HelpDeskSystem.Workflow.csproj", "HelpDeskSystem.Workflow/"]
+COPY ["HelpDeskSystem.Marketing/HelpDeskSystem.Marketing.csproj", "HelpDeskSystem.Marketing/"]
+COPY ["HelpDeskSystem.Scaling/HelpDeskSystem.Scaling.csproj", "HelpDeskSystem.Scaling/"]
+COPY ["HelpDeskSystem.Enterprise/HelpDeskSystem.Enterprise.csproj", "HelpDeskSystem.Enterprise/"]
+COPY ["HelpDeskSystem.ITSM/HelpDeskSystem.ITSM.csproj", "HelpDeskSystem.ITSM/"]
 
 RUN dotnet restore "HelpDeskSystem.API/HelpDeskSystem.API.csproj"
 
@@ -35,7 +39,7 @@ RUN dotnet publish "HelpDeskSystem.API.csproj" -c Release -o /app/publish /p:Use
 # Build runtime image
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 RUN mkdir -p /app/logs /app/uploads
 RUN chmod 777 /app/logs /app/uploads
 

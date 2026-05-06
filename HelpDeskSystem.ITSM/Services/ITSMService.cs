@@ -4,7 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using HelpDeskSystem.Domain.Entities;
+using HelpDeskSystem.Domain.Interfaces;
 using HelpDeskSystem.Application.Interfaces;
+using HelpDeskSystem.Application.DTOs.Tickets;
 using System.Text.Json;
 
 namespace HelpDeskSystem.ITSM.Services
@@ -120,22 +122,17 @@ namespace HelpDeskSystem.ITSM.Services
                 await AssignIncidentSLA(incident);
 
                 // Create incident ticket
-                var ticket = new Ticket
+                var ticketDto = new CreateTicketDto
                 {
                     Title = incident.Title,
                     Description = incident.Description,
                     PriorityId = incident.PriorityId,
-                    CategoryId = incident.CategoryId,
-                    StatusId = 1, // New
-                    CreatedAt = DateTime.UtcNow,
-                    TicketNumber = incident.IncidentNumber,
-                    Type = TicketType.Incident
+                    CategoryId = incident.CategoryId
                 };
 
-                var createdTicket = await _ticketService.CreateTicketAsync(ticket);
+                var createdTicket = await _ticketService.CreateTicketAsync(ticketDto);
                 incident.TicketId = createdTicket.Id;
 
-                // Log incident creation
                 _logger.LogInformation("Created incident {IncidentNumber} for user {UserId}", 
                     incident.IncidentNumber, incident.ReportedByUserId);
 
@@ -169,9 +166,8 @@ namespace HelpDeskSystem.ITSM.Services
                 existingIncident.PriorityId = CalculatePriority(incident.Impact, incident.Urgency);
 
                 // Update corresponding ticket
-                await _ticketService.UpdateTicketAsync(new Ticket
+                await _ticketService.UpdateTicketAsync(existingIncident.TicketId, new UpdateTicketDto
                 {
-                    Id = existingIncident.TicketId,
                     Title = existingIncident.Title,
                     Description = existingIncident.Description,
                     PriorityId = existingIncident.PriorityId,
@@ -191,8 +187,8 @@ namespace HelpDeskSystem.ITSM.Services
         {
             try
             {
-                var tickets = await _ticketService.GetTicketsAsync();
-                var incidents = tickets.Where(t => t.Type == TicketType.Incident)
+                var tickets = await _ticketService.GetAllTicketsAsync();
+                var incidents = tickets.Where(t => t.Title.StartsWith("INC"))
                     .Select(t => new Incident
                     {
                         Id = t.Id,
@@ -201,11 +197,11 @@ namespace HelpDeskSystem.ITSM.Services
                         Description = t.Description,
                         PriorityId = t.PriorityId,
                         CategoryId = t.CategoryId,
-                        Status = MapTicketStatusToIncidentStatus(t.Status),
-                        CreatedAt = t.CreatedAt,
-                        UpdatedAt = t.UpdatedAt,
+                        Status = MapTicketStatusToIncidentStatus(t.Status.ToString()),
+                        CreatedAt = t.CreatedAtUtc,
+                        UpdatedAt = t.UpdatedAtUtc,
                         AssignedToUserId = t.AssignedToUserId?.ToString(),
-                        ReportedByUserId = t.CreatedByUserId?.ToString(),
+                        ReportedByUserId = t.CreatedByUserId.ToString(),
                         TicketId = t.Id
                     }).ToList();
 
@@ -251,7 +247,7 @@ namespace HelpDeskSystem.ITSM.Services
                 incident.AssignedAt = DateTime.UtcNow;
 
                 // Update ticket assignment
-                await _ticketService.AssignTicketAsync(incident.TicketId, int.Parse(assigneeId));
+                await _ticketService.AssignTicketAsync(incident.TicketId, int.Parse(assigneeId), "ITSM incident assignment");
 
                 // Send notification
                 await SendAssignmentNotification(incident, assigneeId);
@@ -313,7 +309,7 @@ namespace HelpDeskSystem.ITSM.Services
                 incident.Status = IncidentStatus.Resolved;
 
                 // Update ticket status
-                await _ticketService.UpdateTicketStatusAsync(incident.TicketId, "Resolved");
+                await _ticketService.ChangeTicketStatusAsync(incident.TicketId, Domain.Enums.TicketStatus.Resolved, int.Parse(incident.AssignedToUserId ?? "0"), "Incident resolved");
 
                 // Check if related problem exists and update
                 await UpdateRelatedProblem(incident);
@@ -344,7 +340,7 @@ namespace HelpDeskSystem.ITSM.Services
                 incident.Status = IncidentStatus.Closed;
 
                 // Update ticket status
-                await _ticketService.UpdateTicketStatusAsync(incident.TicketId, "Closed");
+                await _ticketService.ChangeTicketStatusAsync(incident.TicketId, Domain.Enums.TicketStatus.Closed, int.Parse(incident.AssignedToUserId ?? "0"), "Incident closed");
 
                 // Generate closure report
                 await GenerateClosureReport(incident);
@@ -374,19 +370,15 @@ namespace HelpDeskSystem.ITSM.Services
                 problem.Status = ProblemStatus.New;
 
                 // Create problem ticket
-                var ticket = new Ticket
+                var ticketDto = new CreateTicketDto
                 {
                     Title = problem.Title,
                     Description = problem.Description,
                     PriorityId = problem.PriorityId,
-                    CategoryId = problem.CategoryId,
-                    StatusId = 1, // New
-                    CreatedAt = DateTime.UtcNow,
-                    TicketNumber = problem.ProblemNumber,
-                    Type = TicketType.Problem
+                    CategoryId = problem.CategoryId
                 };
 
-                var createdTicket = await _ticketService.CreateTicketAsync(ticket);
+                var createdTicket = await _ticketService.CreateTicketAsync(ticketDto);
                 problem.TicketId = createdTicket.Id;
 
                 _logger.LogInformation("Created problem {ProblemNumber}", problem.ProblemNumber);
@@ -433,10 +425,10 @@ namespace HelpDeskSystem.ITSM.Services
 
                 // Analyze incident patterns
                 var relatedIncidents = await GetIncidentsForProblem(problemId);
-                rca.IncidentPatterns = AnalyzeIncidentPatterns(relatedIncidents);
+                rca.IncidentPatterns = string.Join("; ", AnalyzeIncidentPatterns(relatedIncidents));
 
                 // Generate recommendations
-                rca.Recommendations = GenerateRecommendations(rca);
+                rca.Recommendations = string.Join("; ", GenerateRecommendations(rca));
 
                 _logger.LogInformation("Completed RCA for problem {ProblemId}", problemId);
                 return rca;
@@ -465,19 +457,15 @@ namespace HelpDeskSystem.ITSM.Services
                 change.PriorityId = CalculateChangePriority(change);
 
                 // Create change ticket
-                var ticket = new Ticket
+                var ticketDto = new CreateTicketDto
                 {
                     Title = change.Title,
                     Description = change.Description,
                     PriorityId = change.PriorityId,
-                    CategoryId = change.CategoryId,
-                    StatusId = 1, // New
-                    CreatedAt = DateTime.UtcNow,
-                    TicketNumber = change.ChangeNumber,
-                    Type = TicketType.Change
+                    CategoryId = change.CategoryId
                 };
 
-                var createdTicket = await _ticketService.CreateTicketAsync(ticket);
+                var createdTicket = await _ticketService.CreateTicketAsync(ticketDto);
                 change.TicketId = createdTicket.Id;
 
                 _logger.LogInformation("Created change request {ChangeNumber}", change.ChangeNumber);
@@ -597,7 +585,8 @@ namespace HelpDeskSystem.ITSM.Services
                 sla.Status = SLAStatus.Active;
 
                 // Calculate breach penalties
-                sla.BreachPenalties = await CalculateBreachPenalties(sla);
+                var penalties = await CalculateBreachPenalties(sla);
+                sla.BreachPenalties = JsonSerializer.Serialize(penalties);
 
                 _logger.LogInformation("Created SLA {SLAId} for service {ServiceId}", sla.SLAId, sla.ServiceId);
                 return sla;
@@ -1042,10 +1031,11 @@ namespace HelpDeskSystem.ITSM.Services
 
         private double CalculateOverallCompliance(ITILComplianceReport report)
         {
-            return (report.IncidentManagementCompliance + 
-                    report.ProblemManagementCompliance + 
-                    report.ChangeManagementCompliance + 
-                    report.AssetManagementCompliance) / 4.0;
+            var incident = report.IncidentManagementCompliance as double? ?? 0;
+            var problem = report.ProblemManagementCompliance as double? ?? 0;
+            var change = report.ChangeManagementCompliance as double? ?? 0;
+            var asset = report.AssetManagementCompliance as double? ?? 0;
+            return (incident + problem + change + asset) / 4.0;
         }
 
         #endregion
@@ -1088,576 +1078,7 @@ namespace HelpDeskSystem.ITSM.Services
         public Task<bool> ValidateITILCompliance(string processType, object processData) => Task.FromResult(true);
     }
 
-    #region Data Models
-
-    public class ITSMSettings
-    {
-        public bool EnableITILCompliance { get; set; } = true;
-        public string DefaultSLAPolicy { get; set; }
-        public List<string> RequiredApprovalGroups { get; set; } = new List<string>();
-        public bool EnableAutoAssignment { get; set; } = true;
-        public bool EnableKnowledgeBase { get; set; } = true;
-        public bool EnableSelfService { get; set; } = true;
-    }
-
-    // Incident Management Models
-    public class Incident
-    {
-        public int Id { get; set; }
-        public string IncidentNumber { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public int PriorityId { get; set; }
-        public int CategoryId { get; set; }
-        public IncidentStatus Status { get; set; }
-        public string Impact { get; set; }
-        public string Urgency { get; set; }
-        public string AssignedToUserId { get; set; }
-        public string AssignmentGroup { get; set; }
-        public string ReportedByUserId { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? AssignedAt { get; set; }
-        public DateTime? ResolvedAt { get; set; }
-        public DateTime? ClosedAt { get; set; }
-        public string Resolution { get; set; }
-        public string ResolutionCode { get; set; }
-        public string ClosureCode { get; set; }
-        public string SatisfactionRating { get; set; }
-        public string EscalationLevel { get; set; }
-        public string EscalationReason { get; set; }
-        public DateTime? EscalatedAt { get; set; }
-        public int? ProblemId { get; set; }
-        public int TicketId { get; set; }
-    }
-
-    public enum IncidentStatus
-    {
-        New,
-        InProgress,
-        Waiting,
-        Resolved,
-        Closed,
-        Reopened,
-        Escalated
-    }
-
-    public class IncidentFilter
-    {
-        public string Status { get; set; }
-        public string Priority { get; set; }
-        public string AssignedTo { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-        public string Category { get; set; }
-    }
-
-    // Problem Management Models
-    public class Problem
-    {
-        public int Id { get; set; }
-        public string ProblemNumber { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public int PriorityId { get; set; }
-        public int CategoryId { get; set; }
-        public ProblemStatus Status { get; set; }
-        public string AssignedToUserId { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public string RootCause { get; set; }
-        public string PermanentFix { get; set; }
-        public DateTime? FixedAt { get; set; }
-        public List<int> RelatedIncidents { get; set; } = new List<int>();
-        public int TicketId { get; set; }
-    }
-
-    public enum ProblemStatus
-    {
-        New,
-        InProgress,
-        Analysis,
-        Fixed,
-        Closed
-    }
-
-    public class ProblemFilter
-    {
-        public string Status { get; set; }
-        public string Priority { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-    }
-
-    public class RootCauseAnalysis
-    {
-        public int Id { get; set; }
-        public int ProblemId { get; set; }
-        public string AnalysisMethod { get; set; }
-        public string RootCause { get; set; }
-        public List<string> ContributingFactors { get; set; } = new List<string>();
-        public List<string> IncidentPatterns { get; set; } = new List<string>();
-        public List<string> Recommendations { get; set; } = new List<string>();
-        public RCAStatus Status { get; set; }
-        public DateTime PerformedAt { get; set; }
-        public string PerformedBy { get; set; }
-    }
-
-    public enum RCAStatus
-    {
-        InProgress,
-        Completed,
-        Reviewed
-    }
-
-    // Change Management Models
-    public class ChangeRequest
-    {
-        public int Id { get; set; }
-        public string ChangeNumber { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public int PriorityId { get; set; }
-        public int CategoryId { get; set; }
-        public ChangeStatus Status { get; set; }
-        public ChangeType Type { get; set; }
-        public string RiskAssessment { get; set; }
-        public string ImpactAssessment { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? ScheduledStartDate { get; set; }
-        public DateTime? ScheduledEndDate { get; set; }
-        public DateTime? ImplementedAt { get; set; }
-        public string RequestedByUserId { get; set; }
-        public string AssignedToUserId { get; set; }
-        public List<string> Approvers { get; set; } = new List<string>();
-        public List<ChangeApproval> Approvals { get; set; } = new List<ChangeApproval>();
-        public DateTime? SubmittedForApprovalAt { get; set; }
-        public string ImplementationDetails { get; set; }
-        public string BackoutPlan { get; set; }
-        public string TestPlan { get; set; }
-        public List<string> AffectedCIs { get; set; } = new List<string>();
-        public int TicketId { get; set; }
-    }
-
-    public enum ChangeStatus
-    {
-        New,
-        PendingApproval,
-        Approved,
-        Rejected,
-        Scheduled,
-        InProgress,
-        Implemented,
-        Reviewed,
-        Cancelled
-    }
-
-    public enum ChangeType
-    {
-        Standard,
-        Normal,
-        Emergency
-    }
-
-    public class ChangeApproval
-    {
-        public string ApproverId { get; set; }
-        public string Decision { get; set; }
-        public string Comments { get; set; }
-        public DateTime ApprovedAt { get; set; }
-    }
-
-    public class ChangeFilter
-    {
-        public string Status { get; set; }
-        public string Type { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-    }
-
-    public class ChangeReview
-    {
-        public string ReviewerId { get; set; }
-        public bool Successful { get; set; }
-        public string Comments { get; set; }
-        public List<string> Issues { get; set; } = new List<string>();
-        public DateTime ReviewedAt { get; set; }
-    }
-
-    // Asset Management Models
-    public class ConfigurationItem
-    {
-        public int Id { get; set; }
-        public string CINumber { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public string CIType { get; set; }
-        public CIStatus Status { get; set; }
-        public string Owner { get; set; }
-        public string Location { get; set; }
-        public Dictionary<string, object> Attributes { get; set; } = new Dictionary<string, object>();
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? LastScanned { get; set; }
-        public List<CIRelationship> Relationships { get; set; } = new List<CIRelationship>();
-    }
-
-    public enum CIStatus
-    {
-        Active,
-        Inactive,
-        UnderMaintenance,
-        Retired,
-        Disposed
-    }
-
-    public class CIRelationship
-    {
-        public string SourceCIId { get; set; }
-        public string TargetCIId { get; set; }
-        public string RelationshipType { get; set; }
-        public DateTime CreatedAt { get; set; }
-    }
-
-    public class CIFilter
-    {
-        public string CIType { get; set; }
-        public string Status { get; set; }
-        public string Owner { get; set; }
-        public string Location { get; set; }
-    }
-
-    public class AssetLifecycle
-    {
-        public int CIId { get; set; }
-        public AssetLifecycleEvent Event { get; set; }
-        public DateTime EventDate { get; set; }
-        public string Description { get; set; }
-        public string PerformedBy { get; set; }
-    }
-
-    public enum AssetLifecycleEvent
-    {
-        Procured,
-        Deployed,
-        UnderMaintenance,
-        Upgraded,
-        Retired,
-        Disposed
-    }
-
-    // Service Catalog Models
-    public class ServiceCatalogItem
-    {
-        public int Id { get; set; }
-        public string ServiceId { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public string Category { get; set; }
-        public ServiceStatus Status { get; set; }
-        public decimal Cost { get; set; }
-        public string Currency { get; set; }
-        public ServiceLevelAgreement SLA { get; set; }
-        public List<ServiceRequestTemplate> RequestTemplates { get; set; } = new List<ServiceRequestTemplate>();
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-    }
-
-    public enum ServiceStatus
-    {
-        Active,
-        Inactive,
-        UnderReview
-    }
-
-    public class ServiceFilter
-    {
-        public string Category { get; set; }
-        public string Status { get; set; }
-        public decimal? MinCost { get; set; }
-        public decimal? MaxCost { get; set; }
-    }
-
-    public class ServiceRequest
-    {
-        public int Id { get; set; }
-        public string RequestNumber { get; set; }
-        public string ServiceId { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public RequestStatus Status { get; set; }
-        public string RequestedByUserId { get; set; }
-        public string AssignedToUserId { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? FulfilledAt { get; set; }
-        public string FulfillmentDetails { get; set; }
-        public Dictionary<string, object> RequestData { get; set; } = new Dictionary<string, object>();
-    }
-
-    public enum RequestStatus
-    {
-        New,
-        InProgress,
-        Fulfilled,
-        Cancelled,
-        Rejected
-    }
-
-    public class ServiceRequestFilter
-    {
-        public string ServiceId { get; set; }
-        public string Status { get; set; }
-        public string RequestedBy { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-    }
-
-    public class ServiceRequestTemplate
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public List<TemplateField> Fields { get; set; } = new List<TemplateField>();
-        public bool RequiresApproval { get; set; }
-        public List<string> ApprovalGroups { get; set; } = new List<string>();
-    }
-
-    public class TemplateField
-    {
-        public string Name { get; set; }
-        public string Type { get; set; }
-        public bool Required { get; set; }
-        public string DefaultValue { get; set; }
-        public List<string> Options { get; set; } = new List<string>();
-    }
-
-    public class CatalogItem
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public string Category { get; set; }
-        public decimal Price { get; set; }
-        public bool Available { get; set; }
-        public List<string> Tags { get; set; } = new List<string>();
-    }
-
-    // SLA Management Models
-    public class ServiceLevelAgreement
-    {
-        public int Id { get; set; }
-        public string SLAId { get; set; }
-        public string Name { get; set; }
-        public string ServiceId { get; set; }
-        public SLAStatus Status { get; set; }
-        public TimeSpan ResponseTime { get; set; }
-        public TimeSpan ResolutionTime { get; set; }
-        public decimal AvailabilityPercentage { get; set; }
-        public List<BreachPenalty> BreachPenalties { get; set; } = new List<BreachPenalty>();
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? EffectiveFrom { get; set; }
-        public DateTime? EffectiveTo { get; set; }
-    }
-
-    public enum SLAStatus
-    {
-        Active,
-        Inactive,
-        Draft
-    }
-
-    public class SLAFilter
-    {
-        public string ServiceId { get; set; }
-        public string Status { get; set; }
-        public DateTime? EffectiveDate { get; set; }
-    }
-
-    public class BreachPenalty
-    {
-        public string BreachType { get; set; }
-        public decimal PenaltyAmount { get; set; }
-        public string PenaltyType { get; set; }
-        public string Description { get; set; }
-    }
-
-    public class SLABreach
-    {
-        public int Id { get; set; }
-        public int SLAId { get; set; }
-        public string BreachDetails { get; set; }
-        public DateTime BreachTime { get; set; }
-        public DateTime RecordedAt { get; set; }
-        public BreachStatus Status { get; set; }
-        public DateTime? ResolvedAt { get; set; }
-        public string ResolutionDetails { get; set; }
-    }
-
-    public enum BreachStatus
-    {
-        Open,
-        InProgress,
-        Resolved,
-        Escalated
-    }
-
-    public class SLAMetric
-    {
-        public string MetricName { get; set; }
-        public double TargetValue { get; set; }
-        public double ActualValue { get; set; }
-        public double CompliancePercentage { get; set; }
-        public DateTime PeriodStart { get; set; }
-        public DateTime PeriodEnd { get; set; }
-    }
-
-    // Knowledge Management Models
-    public class KnowledgeArticle
-    {
-        public int Id { get; set; }
-        public string ArticleNumber { get; set; }
-        public string Title { get; set; }
-        public string Content { get; set; }
-        public string Summary { get; set; }
-        public List<string> Tags { get; set; } = new List<string>();
-        public string Category { get; set; }
-        public ArticleStatus Status { get; set; }
-        public string AuthorId { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? PublishedAt { get; set; }
-        public DateTime? ArchivedAt { get; set; }
-        public int ViewCount { get; set; }
-        public int Rating { get; set; }
-        public int RatingCount { get; set; }
-        public List<string> RelatedArticles { get; set; } = new List<string>();
-        public bool IsPublic { get; set; }
-        public List<KnowledgeFeedback> Feedback { get; set; } = new List<KnowledgeFeedback>();
-    }
-
-    public enum ArticleStatus
-    {
-        Draft,
-        InReview,
-        Published,
-        Archived
-    }
-
-    public class KnowledgeFilter
-    {
-        public string Category { get; set; }
-        public string Status { get; set; }
-        public List<string> Tags { get; set; }
-        public string Author { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-    }
-
-    public class KnowledgeFeedback
-    {
-        public int Id { get; set; }
-        public int ArticleId { get; set; }
-        public string UserId { get; set; }
-        public int Rating { get; set; }
-        public string Comments { get; set; }
-        public bool Helpful { get; set; }
-        public DateTime CreatedAt { get; set; }
-    }
-
-    // Self-Service Models
-    public class SelfServiceRequest
-    {
-        public int Id { get; set; }
-        public string RequestNumber { get; set; }
-        public string ServiceId { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public SelfServiceStatus Status { get; set; }
-        public string RequestedByUserId { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? FulfilledAt { get; set; }
-        public string FulfillmentDetails { get; set; }
-        public Dictionary<string, object> RequestData { get; set; } = new Dictionary<string, object>();
-        public List<SelfServiceApproval> Approvals { get; set; } = new List<SelfServiceApproval>();
-    }
-
-    public enum SelfServiceStatus
-    {
-        New,
-        PendingApproval,
-        Approved,
-        InProgress,
-        Fulfilled,
-        Rejected,
-        Cancelled
-    }
-
-    public class SelfServiceApproval
-    {
-        public string ApproverId { get; set; }
-        public string Decision { get; set; }
-        public string Comments { get; set; }
-        public DateTime ApprovedAt { get; set; }
-    }
-
-    // ITIL Compliance Models
-    public class ITILComplianceReport
-    {
-        public string ReportPeriod { get; set; }
-        public DateTime GeneratedAt { get; set; }
-        public double IncidentManagementCompliance { get; set; }
-        public double ProblemManagementCompliance { get; set; }
-        public double ChangeManagementCompliance { get; set; }
-        public double AssetManagementCompliance { get; set; }
-        public double OverallComplianceScore { get; set; }
-        public List<ComplianceIssue> Issues { get; set; } = new List<ComplianceIssue>();
-    }
-
-    public class ComplianceIssue
-    {
-        public string Process { get; set; }
-        public string Issue { get; set; }
-        public string Severity { get; set; }
-        public string Recommendation { get; set; }
-    }
-
-    public class ITILProcess
-    {
-        public string ProcessId { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public List<ITILRequirement> Requirements { get; set; } = new List<ITILRequirement>();
-    }
-
-    public class ITILRequirement
-    {
-        public string RequirementId { get; set; }
-        public string Description { get; set; }
-        public bool IsMandatory { get; set; }
-        public string ValidationMethod { get; set; }
-    }
-
-    public class ITILAudit
-    {
-        public string ProcessId { get; set; }
-        public DateTime AuditDate { get; set; }
-        public string AuditorId { get; set; }
-        public double ComplianceScore { get; set; }
-        public List<AuditFinding> Findings { get; set; } = new List<AuditFinding>();
-        public List<string> Recommendations { get; set; } = new List<string>();
-    }
-
-    public class AuditFinding
-    {
-        public string Finding { get; set; }
-        public string Severity { get; set; }
-        public string Recommendation { get; set; }
-        public string Status { get; set; }
-    }
+    #region Data Models - These are defined in ITSMModels.cs
 
     #endregion
 }

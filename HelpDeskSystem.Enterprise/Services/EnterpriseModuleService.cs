@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using HelpDeskSystem.Application.Interfaces;
+using HelpDeskSystem.Domain.Interfaces;
 using System.Text.Json;
 
 namespace HelpDeskSystem.Enterprise.Services
@@ -61,7 +62,7 @@ namespace HelpDeskSystem.Enterprise.Services
         // Field Service Management (FSM)
         Task<FieldServiceRequest> CreateFieldServiceRequest(FieldServiceRequest request);
         Task<List<FieldServiceRequest>> GetFieldServiceRequests(FieldFilter filter = null);
-        Task<FieldTechnician> AssignTechnician(string requestId, string technicianId);
+        Task<Technician> AssignTechnician(string requestId, string technicianId);
         Task<WorkOrderManagement> CreateWorkOrder(WorkOrderManagement workOrder);
         Task<MobileFieldApp> GetMobileFieldApp(string technicianId);
         Task<InventoryManagement> ManageFieldInventory(InventoryManagement inventory);
@@ -117,7 +118,7 @@ namespace HelpDeskSystem.Enterprise.Services
             {
                 request.RequestId = await GenerateHRRequestId();
                 request.CreatedAt = DateTime.UtcNow;
-                request.Status = HRStatus.New;
+                request.Status = HRStatus.New.ToString();
 
                 // Route to appropriate HR specialist
                 await RouteToHRSpecialist(request);
@@ -125,7 +126,7 @@ namespace HelpDeskSystem.Enterprise.Services
                 // Check approval requirements
                 if (await RequiresHRApproval(request))
                 {
-                    request.Status = HRStatus.PendingApproval;
+                    request.Status = HRStatus.PendingApproval.ToString();
                     await SendHRApprovalRequest(request);
                 }
 
@@ -308,10 +309,10 @@ namespace HelpDeskSystem.Enterprise.Services
             {
                 incident.IncidentId = await GenerateSecurityIncidentId();
                 incident.CreatedAt = DateTime.UtcNow;
-                incident.Status = SecurityStatus.New;
+                incident.Status = "New";
 
                 // Classify incident severity
-                incident.Severity = await ClassifySecuritySeverity(incident);
+                incident.Severity = (await ClassifySecuritySeverity(incident)).ToString();
 
                 // Initiate incident response workflow
                 await InitiateSecurityResponse(incident);
@@ -334,21 +335,25 @@ namespace HelpDeskSystem.Enterprise.Services
             try
             {
                 threat.ProcessedAt = DateTime.UtcNow;
-                threat.Status = ThreatStatus.Processing;
+                threat.Status = "Processing";
 
                 // Analyze threat patterns
-                threat.ThreatPatterns = await AnalyzeThreatPatterns(threat);
+                threat.ThreatPatterns = (await AnalyzeThreatPatterns(threat))
+                    .Select(p => p.Description)
+                    .ToList();
 
                 // Calculate risk score
                 threat.RiskScore = await CalculateThreatRisk(threat);
 
                 // Determine mitigation strategies
-                threat.MitigationStrategies = await DetermineMitigationStrategies(threat);
+                threat.MitigationStrategies = (await DetermineMitigationStrategies(threat))
+                    .Select(s => s.Description)
+                    .ToList();
 
                 // Update threat database
                 await UpdateThreatDatabase(threat);
 
-                threat.Status = ThreatStatus.Processed;
+                threat.Status = "Processed";
                 _logger.LogInformation("Processed threat intelligence {ThreatId}", threat.ThreatId);
                 return threat;
             }
@@ -365,7 +370,7 @@ namespace HelpDeskSystem.Enterprise.Services
             {
                 assessment.AssessmentId = await GenerateAssessmentId();
                 assessment.StartedAt = DateTime.UtcNow;
-                assessment.Status = AssessmentStatus.InProgress;
+                assessment.Status = "InProgress";
 
                 // Scan for vulnerabilities
                 var vulnerabilities = await ScanForVulnerabilities(assessment);
@@ -380,7 +385,7 @@ namespace HelpDeskSystem.Enterprise.Services
                 // Generate remediation plan
                 assessment.RemediationPlan = await GenerateRemediationPlan(vulnerabilities);
 
-                assessment.Status = AssessmentStatus.Completed;
+                assessment.Status = "Completed";
                 assessment.CompletedAt = DateTime.UtcNow;
 
                 _logger.LogInformation("Completed vulnerability assessment {AssessmentId}", assessment.AssessmentId);
@@ -402,8 +407,7 @@ namespace HelpDeskSystem.Enterprise.Services
             try
             {
                 service.ServiceId = await GenerateITOMServiceId();
-                service.CreatedAt = DateTime.UtcNow;
-                service.Status = ITOMStatus.Active;
+                service.Status = "Active";
 
                 // Configure monitoring
                 await ConfigureServiceMonitoring(service);
@@ -431,7 +435,7 @@ namespace HelpDeskSystem.Enterprise.Services
                 var status = new InfrastructureMonitoring
                 {
                     ComponentId = componentId,
-                    Status = await GetComponentHealth(componentId),
+                    Status = (await GetComponentHealth(componentId)).ToString(),
                     Metrics = await GetComponentMetrics(componentId),
                     Alerts = await GetComponentAlerts(componentId),
                     Dependencies = await GetComponentDependencies(componentId),
@@ -457,7 +461,7 @@ namespace HelpDeskSystem.Enterprise.Services
             {
                 assessment.AssessmentId = await GenerateRiskAssessmentId();
                 assessment.CreatedAt = DateTime.UtcNow;
-                assessment.Status = RiskStatus.New;
+                assessment.Status = "New";
 
                 // Analyze risk factors
                 assessment.RiskFactors = await AnalyzeRiskFactors(assessment);
@@ -487,7 +491,7 @@ namespace HelpDeskSystem.Enterprise.Services
             {
                 control.ControlId = await GenerateControlId();
                 control.CreatedAt = DateTime.UtcNow;
-                control.Status = ControlStatus.Active;
+                control.Status = "Active";
 
                 // Map to compliance frameworks
                 await MapToComplianceFrameworks(control);
@@ -516,7 +520,7 @@ namespace HelpDeskSystem.Enterprise.Services
                 {
                     AuditId = await GenerateAuditId(),
                     Request = request,
-                    Status = AuditStatus.InProgress,
+                    Status = AuditStatus.InProgress.ToString(),
                     StartedAt = DateTime.UtcNow,
                     AuditorId = request.AuditorId
                 };
@@ -530,7 +534,7 @@ namespace HelpDeskSystem.Enterprise.Services
                 // Create recommendations
                 audit.Recommendations = await CreateAuditRecommendations(audit.Findings);
 
-                audit.Status = AuditStatus.Completed;
+                audit.Status = AuditStatus.Completed.ToString();
                 audit.CompletedAt = DateTime.UtcNow;
 
                 _logger.LogInformation("Completed audit {AuditId}", audit.AuditId);
@@ -553,7 +557,7 @@ namespace HelpDeskSystem.Enterprise.Services
             {
                 service.ServiceId = await GenerateWorkplaceServiceId();
                 service.CreatedAt = DateTime.UtcNow;
-                service.Status = WorkplaceStatus.Active;
+                service.Status = WorkplaceStatus.Active.ToString();
 
                 // Configure service delivery
                 await ConfigureServiceDelivery(service);
@@ -610,7 +614,7 @@ namespace HelpDeskSystem.Enterprise.Services
             {
                 request.RequestId = await GenerateFieldServiceRequestId();
                 request.CreatedAt = DateTime.UtcNow;
-                request.Status = FieldStatus.New;
+                request.Status = FieldStatus.New.ToString();
 
                 // Geocode location
                 request.GeocodedLocation = await GeocodeLocation(request.Location);
@@ -635,7 +639,7 @@ namespace HelpDeskSystem.Enterprise.Services
             }
         }
 
-        public async Task<FieldTechnician> AssignTechnician(string requestId, string technicianId)
+        public async Task<Technician> AssignTechnician(string requestId, string technicianId)
         {
             try
             {
@@ -644,7 +648,7 @@ namespace HelpDeskSystem.Enterprise.Services
 
                 // Assign technician
                 request.AssignedTechnician = technician;
-                request.Status = FieldStatus.Assigned;
+                request.Status = FieldStatus.Assigned.ToString();
                 request.AssignedAt = DateTime.UtcNow;
 
                 // Update technician schedule
@@ -676,7 +680,7 @@ namespace HelpDeskSystem.Enterprise.Services
             {
                 app.ApplicationId = await GenerateApplicationId();
                 app.CreatedAt = DateTime.UtcNow;
-                app.Status = ApplicationStatus.Development;
+                app.Status = "Development";
 
                 // Generate application skeleton
                 await GenerateApplicationSkeleton(app);
@@ -706,16 +710,16 @@ namespace HelpDeskSystem.Enterprise.Services
             {
                 workflow.WorkflowId = await GenerateWorkflowId();
                 workflow.CreatedAt = DateTime.UtcNow;
-                workflow.Status = WorkflowStatus.Draft;
+                workflow.Status = "Draft";
 
                 // Validate workflow logic
                 await ValidateWorkflowLogic(workflow);
 
                 // Generate workflow code
-                workflow.GeneratedCode = await GenerateWorkflowCode(workflow);
+                _ = await GenerateWorkflowCode(workflow);
 
                 // Create workflow UI
-                workflow.WorkflowUI = await CreateWorkflowUI(workflow);
+                workflow.UI = await CreateWorkflowUI(workflow);
 
                 _logger.LogInformation("Built workflow {WorkflowId}", workflow.WorkflowId);
                 return workflow;
@@ -737,7 +741,7 @@ namespace HelpDeskSystem.Enterprise.Services
             {
                 connector.ConnectorId = await GenerateConnectorId();
                 connector.CreatedAt = DateTime.UtcNow;
-                connector.Status = ConnectorStatus.Active;
+                connector.Status = ConnectorStatus.Active.ToString();
 
                 // Generate connector code
                 connector.GeneratedCode = await GenerateConnectorCode(connector);
@@ -767,7 +771,7 @@ namespace HelpDeskSystem.Enterprise.Services
             {
                 var health = new IntegrationMonitoring
                 {
-                    OverallStatus = await CalculateOverallIntegrationHealth(),
+                    OverallStatus = (await CalculateOverallIntegrationHealth()).ToString(),
                     Connectors = await GetConnectorHealthStatus(),
                     DataFlows = await GetDataFlowStatus(),
                     ErrorRates = await GetIntegrationErrorRates(),
@@ -1060,6 +1064,15 @@ namespace HelpDeskSystem.Enterprise.Services
         private async Task<ComplianceMetrics> GetComplianceMetrics() => await Task.FromResult(new ComplianceMetrics());
         private async Task<List<EnterpriseAlert>> GetEnterpriseAlerts() => await Task.FromResult(new List<EnterpriseAlert>());
 
+        // Field Service helper methods
+        private async Task<FieldServiceRequest> GetFieldServiceRequest(string requestId) => await Task.FromResult(new FieldServiceRequest());
+
+        // BI helper methods
+        private async Task<List<ReportData>> ExtractBIReportData(BIRequest request) => await Task.FromResult(new List<ReportData>());
+        private async Task<List<Visualization>> GenerateVisualizations(BIRequest request) => await Task.FromResult(new List<Visualization>());
+        private async Task<List<string>> GenerateInsights(Dictionary<string, object> data) => await Task.FromResult(new List<string>());
+        private async Task<List<string>> GenerateBIRecommendations(BIRequest request) => await Task.FromResult(new List<string>());
+
         // Placeholder implementations for remaining interface methods
         public Task<List<HRServiceRequest>> GetHRServiceRequests(HRFilter filter = null) => Task.FromResult(new List<HRServiceRequest>());
         public Task<HRProcess> CreateHRProcess(HRProcess process) => Task.FromResult(new HRProcess());
@@ -1117,7 +1130,15 @@ namespace HelpDeskSystem.Enterprise.Services
     }
 
     // HR Service Delivery Models
-    public class HRServiceRequest { }
+    public class HRServiceRequest
+    {
+        public string RequestId { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string RequestType { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string EmployeeId { get; set; } = string.Empty;
+    }
     public enum HRStatus { New, PendingApproval, Approved, InProgress, Completed, Rejected }
     public class HRFilter { }
     public class HRProcess { }
@@ -1151,6 +1172,10 @@ namespace HelpDeskSystem.Enterprise.Services
     }
     public enum OnboardingCategory { Technology, HR, Facilities, Security }
     public enum TaskStatus { Pending, InProgress, Completed, Cancelled }
+    public enum FieldStatus { New, Assigned, InProgress, Completed, Cancelled }
+    public enum AuditStatus { Planned, InProgress, Completed, Cancelled }
+    public enum WorkplaceStatus { Active, Inactive, Maintenance, Closed }
+    public enum ConnectorStatus { Active, Inactive, Error, Testing }
     public class OffboardingProcess
     {
         public string ProcessId { get; set; }
@@ -1202,311 +1227,16 @@ namespace HelpDeskSystem.Enterprise.Services
     public class CustomerSatisfaction { }
     public class EscalationDetails { }
 
-    // Security Operations Models
-    public class SecurityIncident
-    {
-        public string IncidentId { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public SecuritySeverity Severity { get; set; }
-        public SecurityStatus Status { get; set; }
-        public string Category { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public string ReportedBy { get; set; }
-        public string AssignedTo { get; set; }
-        public List<SecurityEvidence> Evidence { get; set; } = new List<SecurityEvidence>();
-        public string Resolution { get; set; }
-        public DateTime? ResolvedAt { get; set; }
-    }
-    public enum SecuritySeverity { Low, Medium, High, Critical }
-    public enum SecurityStatus { New, InProgress, Contained, Resolved, Closed }
-    public class SecurityFilter { }
-    public class SecurityEvidence { }
-    public class ThreatIntelligence
-    {
-        public string ThreatId { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public ThreatType Type { get; set; }
-        public ThreatStatus Status { get; set; }
-        public DateTime ReceivedAt { get; set; }
-        public double RiskScore { get; set; }
-        public List<ThreatPattern> ThreatPatterns { get; set; } = new List<ThreatPattern>();
-        public List<MitigationStrategy> MitigationStrategies { get; set; } = new List<MitigationStrategy>();
-        public DateTime ProcessedAt { get; set; }
-    }
-    public enum ThreatType { Malware, Phishing, DDoS, DataBreach, InsiderThreat }
-    public enum ThreatStatus { New, Processing, Analyzed, Mitigated }
-    public class ThreatPattern { }
-    public class MitigationStrategy { }
-    public class VulnerabilityAssessment
-    {
-        public string AssessmentId { get; set; }
-        public string TargetSystem { get; set; }
-        public AssessmentStatus Status { get; set; }
-        public DateTime StartedAt { get; set; }
-        public DateTime? CompletedAt { get; set; }
-        public List<Vulnerability> Vulnerabilities { get; set; } = new List<Vulnerability>();
-        public RemediationPlan RemediationPlan { get; set; }
-    }
-    public enum AssessmentStatus { InProgress, Completed, Failed }
-    public class Vulnerability
-    {
-        public string VulnerabilityId { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public VulnerabilitySeverity Severity { get; set; }
-        public double RiskScore { get; set; }
-        public string AffectedComponent { get; set; }
-        public List<string> Recommendations { get; set; } = new List<string>();
-    }
-    public enum VulnerabilitySeverity { Low, Medium, High, Critical }
-    public class RemediationPlan { }
-    public class SecurityIncidentResponse { }
+    // Security Operations Models - These are defined in EnterpriseModels.cs
+    // IT Operations Models - These are defined in EnterpriseModels.cs
 
-    // IT Operations Models
-    public class ITOMService { }
-    public enum ITOMStatus { Active, Inactive, UnderMaintenance }
-    public class ITOMFilter { }
-    public class InfrastructureMonitoring
-    {
-        public string ComponentId { get; set; }
-        public ComponentHealth Status { get; set; }
-        public ComponentMetrics Metrics { get; set; }
-        public List<ComponentAlert> Alerts { get; set; } = new List<ComponentAlert>();
-        public List<ComponentDependency> Dependencies { get; set; } = new List<ComponentDependency>();
-        public DateTime LastUpdated { get; set; }
-    }
-    public enum ComponentHealth { Healthy, Warning, Critical, Unknown }
-    public class ComponentMetrics { }
-    public class ComponentAlert { }
-    public class ComponentDependency { }
-    public class PerformanceMonitoring { }
-    public class AutomatedRemediation { }
+    // GRC Models - These are defined in EnterpriseModels.cs
 
-    // GRC Models
-    public class RiskAssessment
-    {
-        public string AssessmentId { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public RiskStatus Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public List<RiskFactor> RiskFactors { get; set; } = new List<RiskFactor>();
-        public double OverallRiskScore { get; set; }
-        public RiskTreatment RiskTreatment { get; set; }
-        public MitigationPlan MitigationPlan { get; set; }
-    }
-    public enum RiskStatus { New, InProgress, Assessed, Treated, Accepted }
-    public class RiskFilter { }
-    public class RiskFactor { }
-    public class RiskTreatment { }
-    public class MitigationPlan { }
-    public class ComplianceControl
-    {
-        public string ControlId { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public ControlStatus Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public List<ComplianceFramework> Frameworks { get; set; } = new List<ComplianceFramework>();
-        public List<ControlTest> Tests { get; set; } = new List<ControlTest>();
-    }
-    public enum ControlStatus { Active, Inactive, UnderReview }
-    public class ComplianceFilter { }
-    public class ComplianceFramework { }
-    public class ControlTest { }
-    public class AuditTrail
-    {
-        public string AuditId { get; set; }
-        public AuditRequest Request { get; set; }
-        public AuditStatus Status { get; set; }
-        public DateTime StartedAt { get; set; }
-        public DateTime? CompletedAt { get; set; }
-        public string AuditorId { get; set; }
-        public List<AuditResult> Results { get; set; } = new List<AuditResult>();
-        public List<AuditFinding> Findings { get; set; } = new List<AuditFinding>();
-        public List<AuditRecommendation> Recommendations { get; set; } = new List<AuditRecommendation>();
-    }
-    public enum AuditStatus { InProgress, Completed, Failed }
-    public class AuditRequest { }
-    public class AuditResult { }
-    public class AuditFinding { }
-    public class AuditRecommendation { }
-    public class PolicyManagement { }
-    public enum ReportType { SOX, GDPR, HIPAA, ISO27001, PCI_DSS }
-    public class ComplianceReport { }
-
-    // Workplace Service Models
-    public class WorkplaceService { }
-    public enum WorkplaceStatus { Active, Inactive, Maintenance }
-    public class WorkplaceFilter { }
-    public class FacilityManagement
-    {
-        public string FacilityId { get; set; }
-        public string Name { get; set; }
-        public string Location { get; set; }
-        public FacilityType Type { get; set; }
-        public int Capacity { get; set; }
-        public List<FacilityAmenity> Amenities { get; set; } = new List<FacilityAmenity>();
-        public List<MaintenanceSchedule> MaintenanceSchedules { get; set; } = new List<MaintenanceSchedule>();
-    }
-    public class FacilityAmenity { }
-    public class MaintenanceSchedule { }
-    public class SpaceManagement { }
-    public class EquipmentManagement { }
-    public class WorkplaceAnalytics { }
-
-    // Field Service Models
-    public class FieldServiceRequest
-    {
-        public string RequestId { get; set; }
-        public string CustomerId { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public FieldStatus Status { get; set; }
-        public int Priority { get; set; }
-        public string Location { get; set; }
-        public Location GeocodedLocation { get; set; }
-        public DateTime RequestedAt { get; set; }
-        public DateTime? ScheduledAt { get; set; }
-        public FieldTechnician AssignedTechnician { get; set; }
-        public List<Technician> AvailableTechnicians { get; set; } = new List<Technician>();
-        public ServiceRoute OptimizedRoute { get; set; }
-    }
-    public enum FieldStatus { New, Assigned, InProgress, Completed, Cancelled }
-    public class FieldFilter { }
-    public class FieldTechnician
-    {
-        public string TechnicianId { get; set; }
-        public string Name { get; set; }
-        public string Email { get; set; }
-        public string Phone { get; set; }
-        public List<string> Skills { get; set; } = new List<string>();
-        public TechnicianStatus Status { get; set; }
-        public Location CurrentLocation { get; set; }
-        public List<ServiceRequest> Schedule { get; set; } = new List<ServiceRequest>();
-    }
-    public enum TechnicianStatus { Available, Busy, OffDuty }
-    public class ServiceRoute { }
-    public class WorkOrderManagement { }
-    public class MobileFieldApp { }
-    public class InventoryManagement { }
-
-    // Low-Code Platform Models
-    public class CustomApplication
-    {
-        public string ApplicationId { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public ApplicationStatus Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public string GeneratedCode { get; set; }
-        public List<CustomEntity> Entities { get; set; } = new List<CustomEntity>();
-        public List<CustomWorkflow> Workflows { get; set; } = new List<CustomWorkflow>();
-        public List<CustomForm> Forms { get; set; } = new List<CustomForm>();
-        public List<CustomReport> Reports { get; set; } = new List<CustomReport>();
-    }
-    public enum ApplicationStatus { Development, Testing, Active, Deprecated }
-    public class AppFilter { }
-    public class CustomEntity { }
-    public class CustomWorkflow { }
-    public class CustomForm { }
-    public class CustomReport { }
-    public class WorkflowBuilder
-    {
-        public string WorkflowId { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public WorkflowStatus Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public string GeneratedCode { get; set; }
-        public WorkflowUI WorkflowUI { get; set; }
-        public List<WorkflowStep> Steps { get; set; } = new List<WorkflowStep>();
-    }
-    public enum WorkflowStatus { Draft, Active, Inactive }
-    public class WorkflowUI { }
-    public class WorkflowStep { }
-    public class FormBuilder { }
-    public class ReportBuilder { }
-
-    // Integration Hub Models
-    public class IntegrationConnector
-    {
-        public string ConnectorId { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public ConnectorType Type { get; set; }
-        public ConnectorStatus Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public string GeneratedCode { get; set; }
-        public List<DataMapping> DataMappings { get; set; } = new List<DataMapping>();
-        public ConnectionTest ConnectionTest { get; set; }
-    }
-    public enum ConnectorType { API, Database, File, Webhook, Event }
-    public enum ConnectorStatus { Active, Inactive, Error }
-    public class ConnectorFilter { }
-    public class DataMapping { }
-    public class APIManagement { }
-    public class WebhookManagement { }
-    public class IntegrationMonitoring
-    {
-        public OverallHealth OverallStatus { get; set; }
-        public List<ConnectorHealth> Connectors { get; set; } = new List<ConnectorHealth>();
-        public List<DataFlow> DataFlows { get; set; } = new List<DataFlow>();
-        public List<ErrorRate> ErrorRates { get; set; } = new List<ErrorRate>();
-        public List<Latency> Latencies { get; set; } = new List<Latency>();
-        public List<Throughput> Throughput { get; set; } = new List<Throughput>();
-        public DateTime LastUpdated { get; set; }
-    }
-    public enum OverallHealth { Healthy, Warning, Critical }
-    public class ConnectorHealth { }
-    public class DataFlow { }
-    public class ErrorRate { }
-    public class Latency { }
-    public class Throughput { }
-    public class IntegrationBuilder { }
-
-    // Enterprise Analytics Models
-    public class EnterpriseDashboard
-    {
-        public DateTime GeneratedAt { get; set; }
-        public List<EnterpriseKPI> KPIs { get; set; } = new List<EnterpriseKPI>();
-        public OperationalMetrics OperationalMetrics { get; set; }
-        public FinancialMetrics FinancialMetrics { get; set; }
-        public CustomerMetrics CustomerMetrics { get; set; }
-        public EmployeeMetrics EmployeeMetrics { get; set; }
-        public RiskMetrics RiskMetrics { get; set; }
-        public ComplianceMetrics ComplianceMetrics { get; set; }
-        public List<EnterpriseAlert> Alerts { get; set; } = new List<EnterpriseAlert>();
-    }
-    public class BusinessIntelligence
-    {
-        public string ReportId { get; set; }
-        public BIRequest Request { get; set; }
-        public DateTime GeneratedAt { get; set; }
-        public List<ReportData> Data { get; set; } = new List<ReportData>();
-        public List<Visualization> Visualizations { get; set; } = new List<Visualization>();
-        public List<Insight> Insights { get; set; } = new List<Insight>();
-        public List<BIRecommendation> Recommendations { get; set; } = new List<BIRecommendation>();
-    }
-    public class BIRequest { }
-    public class ReportData { }
-    public class Visualization { }
-    public class Insight { }
-    public class BIRecommendation { }
-    public class PredictiveAnalytics { }
-    public class PredictiveModel { }
-    public class KPI { }
-    public class ExecutiveSummary { }
-    public class EnterpriseKPI { }
-    public class OperationalMetrics { }
-    public class FinancialMetrics { }
-    public class CustomerMetrics { }
-    public class EmployeeMetrics { }
-    public class RiskMetrics { }
-    public class ComplianceMetrics { }
-    public class EnterpriseAlert { }
+    // Workplace Service Models - These are defined in EnterpriseModels.cs
+    // Field Service Models - These are defined in EnterpriseModels.cs
+    // Low-Code Platform Models - These are defined in EnterpriseModels.cs
+    // Integration Hub Models - These are defined in EnterpriseModels.cs
+    // Enterprise Analytics Models - These are defined in EnterpriseModels.cs
 
     #endregion
 }

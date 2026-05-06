@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   # Database
@@ -7,10 +7,10 @@ services:
     container_name: helpdesk-sqlserver
     environment:
       - ACCEPT_EULA=Y
-      - SA_PASSWORD=HelpDesk123!@#
+      - MSSQL_SA_PASSWORD=HelpDesk123!@#
       - MSSQL_PID=Developer
     ports:
-      - "1433:1433"
+      - "${SQLSERVER_HOST_PORT:-14333}:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
     networks:
@@ -22,7 +22,7 @@ services:
     image: redis:7-alpine
     container_name: helpdesk-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_HOST_PORT:-6380}:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -33,12 +33,14 @@ services:
   # API Application
   api:
     build:
-      context: ./HelpDeskSystem.API
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: HelpDeskSystem.API/Dockerfile
     container_name: helpdesk-api
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=HelpDeskSystem;User Id=sa;Password=HelpDesk123!@#;TrustServerCertificate=false;MultipleActiveResultSets=true
+      - ASPNETCORE_URLS=http://+:80
+      - SeedData__Enabled=false
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=HelpDeskSystem;User Id=sa;Password=HelpDesk123!@#;TrustServerCertificate=true;MultipleActiveResultSets=true
       - ConnectionStrings__Redis=redis:6379
       - JwtSettings__SecretKey=YourSuperSecretKeyHere12345678901234567890
       - JwtSettings__Issuer=HelpDeskSystem
@@ -79,7 +81,7 @@ services:
       dockerfile: Dockerfile
     container_name: helpdesk-web
     environment:
-      - REACT_APP_API_URL=http://localhost:5000
+      - REACT_APP_API_URL=/api
       - REACT_APP_ENVIRONMENT=production
     ports:
       - "3000:80"
@@ -92,12 +94,14 @@ services:
   # Hangfire Dashboard (Background Job Processing)
   hangfire:
     build:
-      context: ./HelpDeskSystem.API
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: HelpDeskSystem.API/Dockerfile
     container_name: helpdesk-hangfire
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=HelpDeskSystem;User Id=sa;Password=HelpDesk123!@#;TrustServerCertificate=false;MultipleActiveResultSets=true
+      - ASPNETCORE_URLS=http://+:80
+      - SeedData__Enabled=false
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=HelpDeskSystem;User Id=sa;Password=HelpDesk123!@#;TrustServerCertificate=true;MultipleActiveResultSets=true
       - ConnectionStrings__Redis=redis:6379
       - HangfireSettings__DashboardEnabled=true
       - HangfireSettings__WorkerCount=5
@@ -114,22 +118,22 @@ services:
     volumes:
       - ./logs:/app/logs
 
-  # Nginx Reverse Proxy
-  nginx:
-    image: nginx:alpine
-    container_name: helpdesk-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/ssl:/etc/nginx/ssl
-    depends_on:
-      - api
-      - web
-    networks:
-      - helpdesk-network
-    restart: unless-stopped
+  # Nginx Reverse Proxy - Temporarily disabled
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: helpdesk-nginx
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+  #     - ./nginx/ssl:/etc/nginx/ssl
+  #   depends_on:
+  #     - api
+  #     - web
+  #   networks:
+  #     - helpdesk-network
+  #   restart: unless-stopped
 
 volumes:
   sqlserver_data:

@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+// using System.Management;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
-using System.Management;
+// using System.Management;
 using System.IO;
 using System.Text;
 
@@ -62,7 +63,7 @@ namespace HelpDeskSystem.Scaling.Services
         Task<CapacityPlan> CreateCapacityPlan(CapacityPlan plan);
 
         // Health Monitoring
-        Task<HealthStatus> GetSystemHealth();
+        Task<HealthReport> GetSystemHealth();
         Task<List<HealthCheck>> PerformHealthChecks();
         Task<IncidentResponse> TriggerIncidentResponse(Incident incident);
         Task<RecoveryAction> ExecuteRecoveryAction(RecoveryAction action);
@@ -263,7 +264,7 @@ namespace HelpDeskSystem.Scaling.Services
                     ActiveUsers = await GetActiveUsers(),
                     ConcurrentSessions = await GetConcurrentSessions(),
                     QueueDepth = await GetQueueDepth(),
-                    CacheHitRate = await GetApplicationCacheHitRate()
+                    CacheHitRate = await GetApplicationCacheHitRatio()
                 };
 
                 return metrics;
@@ -768,37 +769,22 @@ namespace HelpDeskSystem.Scaling.Services
         private async Task<List<ServerMetrics>> GetServerMetricsFromAllNodes()
         {
             var tasks = _activeNodes.Keys.Select(nodeId => GetServerMetrics(nodeId));
-            return await Task.WhenAll(tasks);
+            var results = await Task.WhenAll(tasks);
+            return results.ToList();
         }
 
         private async Task<double> GetCPUUsage(ServerNode node)
         {
-            try
-            {
-                var cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
-                cpuCounter.NextValue();
-                await Task.Delay(1000);
-                return cpuCounter.NextValue();
-            }
-            catch
-            {
-                return await GetRemoteCPUUsage(node);
-            }
+            // PerformanceCounter requires System.Diagnostics.PerformanceCounter assembly
+            // Using placeholder implementation
+            return await GetRemoteCPUUsage(node);
         }
 
         private async Task<double> GetMemoryUsage(ServerNode node)
         {
-            try
-            {
-                var memCounter = new PerformanceCounter("Memory", "Available MBytes");
-                var totalMemory = GC.GetTotalMemory(false);
-                var availableMemory = memCounter.NextValue();
-                return ((totalMemory - availableMemory) / totalMemory) * 100;
-            }
-            catch
-            {
-                return await GetRemoteMemoryUsage(node);
-            }
+            // PerformanceCounter requires System.Diagnostics.PerformanceCounter assembly
+            // Using placeholder implementation
+            return await GetRemoteMemoryUsage(node);
         }
 
         private async Task<double> GetRemoteCPUUsage(ServerNode node)
@@ -969,9 +955,9 @@ namespace HelpDeskSystem.Scaling.Services
             return await Task.FromResult(87.3);
         }
 
-        private async Task<HealthStatus> CalculateOverallHealth()
+        private async Task<HealthStatusEnum> CalculateOverallHealth()
         {
-            return HealthStatus.Healthy;
+            return HealthStatusEnum.Healthy;
         }
 
         private async Task<ScalingAction> AnalyzePolicy(ScalingPolicy policy, InfrastructureMetrics metrics)
@@ -1238,7 +1224,7 @@ namespace HelpDeskSystem.Scaling.Services
         public Task<ResourceUtilization> GetResourceUtilization() => Task.FromResult(new ResourceUtilization());
         public Task<CapacityRecommendation> GetCapacityRecommendations() => Task.FromResult(new CapacityRecommendation());
         public Task<CapacityPlan> CreateCapacityPlan(CapacityPlan plan) => Task.FromResult(new CapacityPlan());
-        public Task<HealthStatus> GetSystemHealth() => Task.FromResult(new HealthStatus());
+        public Task<HealthReport> GetSystemHealth() => Task.FromResult(new HealthReport());
         public Task<List<HealthCheck>> PerformHealthChecks() => Task.FromResult(new List<HealthCheck>());
         public Task<IncidentResponse> TriggerIncidentResponse(Incident incident) => Task.FromResult(new IncidentResponse());
         public Task<RecoveryAction> ExecuteRecoveryAction(RecoveryAction action) => Task.FromResult(new RecoveryAction());
@@ -1253,7 +1239,7 @@ namespace HelpDeskSystem.Scaling.Services
         public DatabaseMetrics DatabaseMetrics { get; set; }
         public NetworkMetrics NetworkMetrics { get; set; }
         public ApplicationMetrics ApplicationMetrics { get; set; }
-        public HealthStatus OverallHealth { get; set; }
+        public HealthStatusEnum OverallHealth { get; set; }
     }
 
     public class ServerMetrics
@@ -1850,7 +1836,7 @@ namespace HelpDeskSystem.Scaling.Services
         public decimal EstimatedCost { get; set; }
     }
 
-    public class HealthStatus
+    public class HealthReport
     {
         public bool IsHealthy { get; set; }
         public List<HealthIssue> Issues { get; set; } = new List<HealthIssue>();
@@ -1880,7 +1866,7 @@ namespace HelpDeskSystem.Scaling.Services
         public string CheckId { get; set; }
         public string Component { get; set; }
         public HealthCheckType Type { get; set; }
-        public HealthStatus Status { get; set; }
+        public HealthStatusEnum Status { get; set; }
         public DateTime ExecutedAt { get; set; }
         public TimeSpan ResponseTime { get; set; }
         public string Details { get; set; }
@@ -1975,12 +1961,12 @@ namespace HelpDeskSystem.Scaling.Services
         Replace
     }
 
-    public enum HealthStatus
+    public enum HealthStatusEnum
     {
         Healthy,
         Warning,
         Critical,
-        Unknown
+        Unhealthy
     }
 
     #endregion

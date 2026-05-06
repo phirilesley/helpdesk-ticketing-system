@@ -268,3 +268,57 @@ public class UsageMeter : BaseEntity
     public DateTime UsageDateUtc { get; set; }
     public decimal Quantity { get; set; }
 }
+
+public class OutboundChannelMessage : BaseEntity
+{
+    public int TenantId { get; set; }
+    public int ConnectorId { get; set; }
+    public int TicketId { get; set; }
+    public int RequestedByUserId { get; set; }
+    public string IdempotencyKey { get; set; } = string.Empty;
+    public string RecipientAddress { get; set; } = string.Empty;
+    public string Subject { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string MetadataJson { get; set; } = "{}";
+    public OutboundMessageStatus Status { get; set; } = OutboundMessageStatus.Pending;
+    public int AttemptCount { get; set; }
+    public int MaxAttempts { get; set; } = 5;
+    public DateTime? NextAttemptAtUtc { get; set; } = DateTime.UtcNow;
+    public string ProviderMessageId { get; set; } = string.Empty;
+    public string LastError { get; set; } = string.Empty;
+    public int PartitionKey { get; set; }
+    public DateTime? SentAtUtc { get; set; }
+}
+
+public class OutboundDeliveryReceipt : BaseEntity
+{
+    public int TenantId { get; set; }
+    public int OutboundChannelMessageId { get; set; }
+    public string ProviderMessageId { get; set; } = string.Empty;
+    public DeliveryReceiptStatus Status { get; set; } = DeliveryReceiptStatus.Accepted;
+    public string RawPayloadJson { get; set; } = "{}";
+    public DateTime ReceivedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
+public class TenantRegionPolicy : BaseEntity
+{
+    public int TenantId { get; set; }
+    public string PrimaryRegion { get; set; } = "af-south";
+    public string SecondaryRegion { get; set; } = "eu-west";
+    public TenantFailoverMode FailoverMode { get; set; } = TenantFailoverMode.Manual;
+    public bool AutoFailbackEnabled { get; set; }
+    public bool IsActive { get; set; } = true;
+    public string RunbookUrl { get; set; } = string.Empty;
+    public string MonitoringConfigJson { get; set; } = "{}";
+}
+
+public class RegionSyntheticCheck : BaseEntity
+{
+    public int TenantId { get; set; }
+    public string Region { get; set; } = string.Empty;
+    public string CheckType { get; set; } = string.Empty;
+    public bool Passed { get; set; }
+    public int DurationMs { get; set; }
+    public string Detail { get; set; } = string.Empty;
+    public DateTime CheckedAtUtc { get; set; } = DateTime.UtcNow;
+}

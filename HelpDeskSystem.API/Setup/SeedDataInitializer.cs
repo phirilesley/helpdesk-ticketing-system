@@ -325,7 +325,7 @@ public static class SeedDataInitializer
             });
         }
 
-        if (!await context.OmnichannelConnectors.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        if (!await context.OmnichannelConnectors.AnyAsync(x => x.TenantId == tenantId && x.ProviderKey == "portal" && !x.IsDeleted, cancellationToken))
         {
             context.OmnichannelConnectors.Add(new OmnichannelConnector
             {
@@ -337,6 +337,57 @@ public static class SeedDataInitializer
                 InboundSigningSecretHash = string.Empty,
                 SignatureHeaderName = "X-Channel-Signature",
                 SignatureAlgorithm = "hmac-sha256",
+                DedupWindowMinutes = 120,
+                Status = ConnectorStatus.Enabled
+            });
+        }
+
+        if (!await context.OmnichannelConnectors.AnyAsync(x => x.TenantId == tenantId && x.ProviderKey == "slack" && !x.IsDeleted, cancellationToken))
+        {
+            context.OmnichannelConnectors.Add(new OmnichannelConnector
+            {
+                TenantId = tenantId,
+                ChannelType = ChannelType.Chat,
+                Name = "Slack Outbound",
+                ProviderKey = "slack",
+                ConfigJson = "{\"botToken\":\"\",\"defaultChannel\":\"\"}",
+                InboundSigningSecretHash = string.Empty,
+                SignatureHeaderName = "X-Slack-Signature",
+                SignatureAlgorithm = "hmac-sha256",
+                DedupWindowMinutes = 120,
+                Status = ConnectorStatus.Enabled
+            });
+        }
+
+        if (!await context.OmnichannelConnectors.AnyAsync(x => x.TenantId == tenantId && x.ProviderKey == "meta_whatsapp" && !x.IsDeleted, cancellationToken))
+        {
+            context.OmnichannelConnectors.Add(new OmnichannelConnector
+            {
+                TenantId = tenantId,
+                ChannelType = ChannelType.WhatsApp,
+                Name = "WhatsApp Cloud Outbound",
+                ProviderKey = "meta_whatsapp",
+                ConfigJson = "{\"phoneNumberId\":\"\",\"accessToken\":\"\",\"appSecret\":\"\",\"verifyToken\":\"\"}",
+                InboundSigningSecretHash = string.Empty,
+                SignatureHeaderName = "X-Hub-Signature-256",
+                SignatureAlgorithm = "hmac-sha256",
+                DedupWindowMinutes = 120,
+                Status = ConnectorStatus.Enabled
+            });
+        }
+
+        if (!await context.OmnichannelConnectors.AnyAsync(x => x.TenantId == tenantId && x.ProviderKey == "twilio" && !x.IsDeleted, cancellationToken))
+        {
+            context.OmnichannelConnectors.Add(new OmnichannelConnector
+            {
+                TenantId = tenantId,
+                ChannelType = ChannelType.Voice,
+                Name = "Twilio Voice/SMS Outbound",
+                ProviderKey = "twilio",
+                ConfigJson = "{\"accountSid\":\"\",\"authToken\":\"\",\"fromNumber\":\"\"}",
+                InboundSigningSecretHash = string.Empty,
+                SignatureHeaderName = "X-Twilio-Signature",
+                SignatureAlgorithm = "twilio-signature",
                 DedupWindowMinutes = 120,
                 Status = ConnectorStatus.Enabled
             });
@@ -516,6 +567,21 @@ public static class SeedDataInitializer
                     ActionConfigJson = "{\"status\":\"Escalated\"}",
                     IsEnabled = true
                 });
+        }
+
+        if (!await context.TenantRegionPolicies.AnyAsync(x => x.TenantId == tenantId && !x.IsDeleted, cancellationToken))
+        {
+            context.TenantRegionPolicies.Add(new TenantRegionPolicy
+            {
+                TenantId = tenantId,
+                PrimaryRegion = "af-south",
+                SecondaryRegion = "eu-west",
+                FailoverMode = TenantFailoverMode.Manual,
+                AutoFailbackEnabled = false,
+                IsActive = true,
+                RunbookUrl = "https://runbooks.example.com/helpdesk/multi-region-failover",
+                MonitoringConfigJson = "{\"syntheticUrls\":[\"https://status.example.com/health\"]}"
+            });
         }
 
         await context.SaveChangesAsync(cancellationToken);

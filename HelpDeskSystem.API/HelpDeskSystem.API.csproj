@@ -10,6 +10,7 @@
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.12" />
     <PackageReference Include="Hangfire.SqlServer" Version="1.8.12" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.8" />
     <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="7.1.2" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.1.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
@@ -25,6 +26,13 @@
     <ProjectReference Include="..\HelpDeskSystem.Realtime\HelpDeskSystem.Realtime.csproj" />
     <ProjectReference Include="..\HelpDeskSystem.Reporting\HelpDeskSystem.Reporting.csproj" />
     <ProjectReference Include="..\HelpDeskSystem.AI\HelpDeskSystem.AI.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.Enterprise\HelpDeskSystem.Enterprise.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.DevOps\HelpDeskSystem.DevOps.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.ITSM\HelpDeskSystem.ITSM.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.Marketing\HelpDeskSystem.Marketing.csproj" />
+    <ProjectReference Include="..\HelpDeskSystem.Scaling\HelpDeskSystem.Scaling.csproj" />
   </ItemGroup>
 
+
 </Project>
+

@@ -41,6 +41,8 @@ const EnterpriseAdmin: React.FC = () => {
   const [identityProviders, setIdentityProviders] = useState<Row[]>([]);
   const [abacRules, setAbacRules] = useState<Row[]>([]);
   const [connectors, setConnectors] = useState<Row[]>([]);
+  const [outboundMessages, setOutboundMessages] = useState<Row[]>([]);
+  const [outboundReceipts, setOutboundReceipts] = useState<Row[]>([]);
   const [workflowDefs, setWorkflowDefs] = useState<Row[]>([]);
   const [slaPauseRules, setSlaPauseRules] = useState<Row[]>([]);
   const [slaBreachActions, setSlaBreachActions] = useState<Row[]>([]);
@@ -50,6 +52,10 @@ const EnterpriseAdmin: React.FC = () => {
   const [webhooks, setWebhooks] = useState<Row[]>([]);
   const [marketplaceCatalog, setMarketplaceCatalog] = useState<Row[]>([]);
   const [marketplaceInstalls, setMarketplaceInstalls] = useState<Row[]>([]);
+  const [integrationTemplates, setIntegrationTemplates] = useState<Row[]>([]);
+  const [regionPolicies, setRegionPolicies] = useState<Row[]>([]);
+  const [syntheticChecks, setSyntheticChecks] = useState<Row[]>([]);
+  const [runbookSteps, setRunbookSteps] = useState<Row[]>([]);
   const [projects, setProjects] = useState<Row[]>([]);
   const [releases, setReleases] = useState<Row[]>([]);
   const [sprintMetrics, setSprintMetrics] = useState<Row[]>([]);
@@ -58,15 +64,18 @@ const EnterpriseAdmin: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<Row[]>([]);
   const [invoices, setInvoices] = useState<Row[]>([]);
   const [usage, setUsage] = useState<Row[]>([]);
+  const [operationsSummary, setOperationsSummary] = useState<Row[]>([]);
 
   const tabs = useMemo(() => [
     'Identity',
     'Access',
     'Omnichannel',
+    'Delivery',
     'Workflow',
     'SLA+',
     'Compliance',
     'Integrations',
+    'Regions',
     'Projects',
     'Billing'
   ], []);
@@ -83,6 +92,7 @@ const EnterpriseAdmin: React.FC = () => {
         idpRes,
         abacRes,
         connRes,
+        outboundRes,
         wfRes,
         slaPauseRes,
         slaActionRes,
@@ -92,6 +102,8 @@ const EnterpriseAdmin: React.FC = () => {
         whRes,
         marketRes,
         installRes,
+        regionPolicyRes,
+        syntheticRes,
         projRes,
         relRes,
         spRes,
@@ -104,6 +116,7 @@ const EnterpriseAdmin: React.FC = () => {
         axios.get('/api/admin/identity/providers'),
         axios.get('/api/admin/identity/abac'),
         axios.get('/api/omnichannel/connectors'),
+        axios.get('/api/omnichannel/outbound/messages'),
         axios.get('/api/workflow-builder/definitions'),
         axios.get('/api/sla/advanced/pause-rules'),
         axios.get('/api/sla/advanced/breach-actions'),
@@ -113,6 +126,8 @@ const EnterpriseAdmin: React.FC = () => {
         axios.get('/api/integrations/webhooks'),
         axios.get('/api/integrations/marketplace/catalog'),
         axios.get('/api/integrations/marketplace/installs'),
+        axios.get('/api/regions/policies'),
+        axios.get('/api/regions/synthetic/checks'),
         axios.get('/api/projects'),
         axios.get('/api/projects/releases'),
         axios.get('/api/projects/agile-metrics'),
@@ -123,9 +138,12 @@ const EnterpriseAdmin: React.FC = () => {
         axios.get('/api/billing/usage')
       ]);
 
+      const outboundRows = outboundRes.data ?? [];
+
       setIdentityProviders(idpRes.data ?? []);
       setAbacRules(abacRes.data ?? []);
       setConnectors(connRes.data ?? []);
+      setOutboundMessages(outboundRows);
       setWorkflowDefs(wfRes.data ?? []);
       setSlaPauseRules(slaPauseRes.data ?? []);
       setSlaBreachActions(slaActionRes.data ?? []);
@@ -135,6 +153,8 @@ const EnterpriseAdmin: React.FC = () => {
       setWebhooks(whRes.data ?? []);
       setMarketplaceCatalog(marketRes.data ?? []);
       setMarketplaceInstalls(installRes.data ?? []);
+      setRegionPolicies(regionPolicyRes.data ?? []);
+      setSyntheticChecks(syntheticRes.data ?? []);
       setProjects(projRes.data ?? []);
       setReleases(relRes.data ?? []);
       setSprintMetrics(spRes.data ?? []);
@@ -146,6 +166,39 @@ const EnterpriseAdmin: React.FC = () => {
       setSubscriptions(subRes.data ?? []);
       setInvoices(invoiceRes.data ?? []);
       setUsage(usageRes.data ?? []);
+
+      const latestMessageId = outboundRows.length > 0 ? outboundRows[0].id : null;
+      const [templatesResult, opsResult, runbookResult, receiptResult] = await Promise.allSettled([
+        axios.get('/api/integrations/templates'),
+        axios.get('/api/operations/dashboard'),
+        axios.get('/api/regions/runbook-template'),
+        latestMessageId ? axios.get(`/api/omnichannel/outbound/receipts/${latestMessageId}`) : Promise.resolve({ data: [] })
+      ]);
+
+      if (templatesResult.status === 'fulfilled') {
+        setIntegrationTemplates(templatesResult.value.data ?? []);
+      } else {
+        setIntegrationTemplates([]);
+      }
+
+      if (opsResult.status === 'fulfilled') {
+        setOperationsSummary([opsResult.value.data ?? {}]);
+      } else {
+        setOperationsSummary([]);
+      }
+
+      if (runbookResult.status === 'fulfilled') {
+        const steps = runbookResult.value.data?.steps ?? [];
+        setRunbookSteps(Array.isArray(steps) ? steps.map((step: string, index: number) => ({ step: index + 1, detail: step })) : []);
+      } else {
+        setRunbookSteps([]);
+      }
+
+      if (receiptResult.status === 'fulfilled') {
+        setOutboundReceipts(receiptResult.value.data ?? []);
+      } else {
+        setOutboundReceipts([]);
+      }
     } catch (e: any) {
       setError(e?.response?.data?.error ?? 'Failed to load enterprise modules.');
     } finally {
@@ -163,6 +216,29 @@ const EnterpriseAdmin: React.FC = () => {
     } catch (e: any) {
       setError(e?.response?.data?.error ?? 'Action failed.');
     }
+  };
+
+  const resolveTestConnector = () => connectors.find((x) => {
+    const provider = String(x.providerKey ?? '').toLowerCase();
+    return provider === 'slack' || provider === 'meta_whatsapp' || provider === 'twilio';
+  });
+
+  const queueOutboundTest = async () => {
+    const connector = resolveTestConnector();
+    if (!connector?.id) {
+      throw new Error('No outbound connector found. Seed or create slack/meta_whatsapp/twilio connector first.');
+    }
+
+    await axios.post('/api/omnichannel/outbound/queue', {
+      connectorId: connector.id,
+      ticketId: 1,
+      idempotencyKey: `ui-${Date.now()}`,
+      recipientAddress: 'integration-test-recipient',
+      subject: 'Outbound Pipeline Test',
+      content: `Outbound test message via ${connector.providerKey}.`,
+      metadataJson: JSON.stringify({ source: 'enterprise-admin-ui' }),
+      maxAttempts: 5
+    });
   };
 
   const renderTable = (rows: Row[], columns: string[]) => (
@@ -265,6 +341,7 @@ const EnterpriseAdmin: React.FC = () => {
             onClick={() => void runAction(() => axios.post('/api/omnichannel/connectors', {
               name: `WebForm ${Date.now()}`,
               channelType: 6,
+              providerKey: 'portal',
               configJson: '{"source":"portal"}',
               inboundSigningSecret: '',
               status: 2
@@ -273,10 +350,32 @@ const EnterpriseAdmin: React.FC = () => {
             Add Connector
           </Button>
         </Box>
-        {renderTable(connectors, ['id', 'name', 'channelType', 'status'])}
+        {renderTable(connectors, ['id', 'name', 'providerKey', 'channelType', 'status'])}
       </TabPanel>
 
       <TabPanel value={tab} index={3}>
+        <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
+          <Button
+            variant="contained"
+            onClick={() => void runAction(queueOutboundTest, 'Outbound test message queued.')}
+          >
+            Queue Outbound Test
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => void runAction(() => axios.post('/api/regions/synthetic/run'), 'Synthetic region checks executed.')}
+          >
+            Trigger Synthetic Checks
+          </Button>
+        </Box>
+        <Typography variant="h6" sx={{ mb: 1 }}>Outbound Messages</Typography>
+        {renderTable(outboundMessages, ['id', 'connectorId', 'ticketId', 'status', 'attemptCount', 'maxAttempts', 'providerMessageId', 'lastError', 'createdAtUtc'])}
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="h6" sx={{ mb: 1 }}>Latest Message Receipts</Typography>
+        {renderTable(outboundReceipts, ['id', 'outboundChannelMessageId', 'providerMessageId', 'status', 'receivedAtUtc'])}
+      </TabPanel>
+
+      <TabPanel value={tab} index={4}>
         <Box sx={{ mb: 2 }}>
           <Button
             variant="contained"
@@ -293,7 +392,7 @@ const EnterpriseAdmin: React.FC = () => {
         {renderTable(workflowDefs, ['id', 'name', 'version', 'isPublished'])}
       </TabPanel>
 
-      <TabPanel value={tab} index={4}>
+      <TabPanel value={tab} index={5}>
         <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
           <Button
             variant="contained"
@@ -329,7 +428,7 @@ const EnterpriseAdmin: React.FC = () => {
         {renderTable(slaBreachActions, ['id', 'name', 'breachType', 'triggerAfterBreachMinutes', 'executionOrder', 'actionType', 'isEnabled'])}
       </TabPanel>
 
-      <TabPanel value={tab} index={5}>
+      <TabPanel value={tab} index={6}>
         <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
           <Button
             variant="contained"
@@ -363,7 +462,7 @@ const EnterpriseAdmin: React.FC = () => {
         {renderTable(dsrItems, ['id', 'referenceNumber', 'requestType', 'status', 'subjectEmail'])}
       </TabPanel>
 
-      <TabPanel value={tab} index={6}>
+      <TabPanel value={tab} index={7}>
         <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
           <Button
             variant="contained"
@@ -403,9 +502,45 @@ const EnterpriseAdmin: React.FC = () => {
         <Divider sx={{ my: 2 }} />
         <Typography variant="h6" sx={{ mb: 1 }}>Tenant Installs</Typography>
         {renderTable(marketplaceInstalls, ['id', 'marketplaceAppId', 'status', 'installedVersion'])}
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="h6" sx={{ mb: 1 }}>Integration Templates</Typography>
+        {renderTable(integrationTemplates, ['key', 'category', 'displayName', 'authMode'])}
       </TabPanel>
 
-      <TabPanel value={tab} index={7}>
+      <TabPanel value={tab} index={8}>
+        <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
+          <Button
+            variant="contained"
+            onClick={() => void runAction(() => axios.post('/api/regions/policies', {
+              primaryRegion: 'af-south',
+              secondaryRegion: 'eu-west',
+              failoverMode: 1,
+              autoFailbackEnabled: false,
+              isActive: true,
+              runbookUrl: 'https://runbooks.example.com/helpdesk/multi-region-failover',
+              monitoringConfigJson: '{"syntheticUrls":["https://status.example.com/health"]}'
+            }), 'Region policy upserted.')}
+          >
+            Upsert Region Policy
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => void runAction(() => axios.post('/api/regions/synthetic/run'), 'Synthetic checks executed.')}
+          >
+            Run Synthetic Checks
+          </Button>
+        </Box>
+        <Typography variant="h6" sx={{ mb: 1 }}>Tenant Region Policies</Typography>
+        {renderTable(regionPolicies, ['id', 'primaryRegion', 'secondaryRegion', 'failoverMode', 'autoFailbackEnabled', 'isActive', 'runbookUrl'])}
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="h6" sx={{ mb: 1 }}>Synthetic Checks</Typography>
+        {renderTable(syntheticChecks, ['id', 'region', 'checkType', 'passed', 'durationMs', 'detail', 'checkedAtUtc'])}
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="h6" sx={{ mb: 1 }}>Runbook Template</Typography>
+        {renderTable(runbookSteps, ['step', 'detail'])}
+      </TabPanel>
+
+      <TabPanel value={tab} index={9}>
         <Box sx={{ mb: 2 }}>
           <Button
             variant="contained"
@@ -431,7 +566,7 @@ const EnterpriseAdmin: React.FC = () => {
         {renderTable(dependencyGraphSummary, ['nodes', 'edges'])}
       </TabPanel>
 
-      <TabPanel value={tab} index={8}>
+      <TabPanel value={tab} index={10}>
         <Box sx={{ mb: 2 }}>
           <Button
             variant="contained"
@@ -458,6 +593,9 @@ const EnterpriseAdmin: React.FC = () => {
         <Divider sx={{ my: 2 }} />
         <Typography variant="h6" sx={{ mb: 1 }}>Usage</Typography>
         {renderTable(usage, ['id', 'metricName', 'usageDateUtc', 'quantity'])}
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="h6" sx={{ mb: 1 }}>Operations Summary</Typography>
+        {renderTable(operationsSummary, ['generatedAtUtc', 'openTickets', 'inboundBacklog', 'webhookPending', 'webhookFailures24h', 'slaBreaches24h'])}
       </TabPanel>
     </Box>
   );

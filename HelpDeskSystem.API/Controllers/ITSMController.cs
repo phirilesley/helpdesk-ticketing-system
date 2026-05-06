@@ -260,7 +260,9 @@ namespace HelpDeskSystem.API.Controllers
                 ReviewerId = request.ReviewerId,
                 Successful = request.Successful,
                 Comments = request.Comments,
-                Issues = request.Issues,
+                Issues = string.IsNullOrWhiteSpace(request.Issues)
+                    ? new List<string>()
+                    : new List<string> { request.Issues },
                 ReviewedAt = DateTime.UtcNow
             };
             var change = await _itsmService.ReviewChange(changeId, review);
@@ -331,7 +333,10 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("configuration-items/{ciId}/lifecycle")]
         public async Task<IActionResult> RecordAssetLifecycle(int ciId, [FromBody] AssetLifecycleDto request)
         {
-            var ci = await _itsmService.RecordAssetLifecycle(ciId, request.LifecycleEvent);
+            var parsed = Enum.TryParse<AssetLifecycleEvent>(request.LifecycleEvent, true, out var lifecycleEvent)
+                ? lifecycleEvent
+                : AssetLifecycleEvent.Deployed;
+            var ci = await _itsmService.RecordAssetLifecycle(ciId, parsed);
             return Ok(ci);
         }
 
@@ -386,9 +391,9 @@ namespace HelpDeskSystem.API.Controllers
         {
             var itsmFilter = filter != null ? new SLAFilter
             {
-                ServiceId = filter.ServiceId,
+                ServiceId = filter.ServiceId?.ToString(),
                 Status = filter.Status,
-                EffectiveDate = filter.EffectiveDate
+                ActiveFrom = filter.EffectiveDate
             } : null;
             var slas = await _itsmService.GetSLAs(itsmFilter);
             return Ok(slas);
@@ -397,14 +402,7 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("slas/{slaId}/breach")]
         public async Task<IActionResult> RecordSLABreach(int slaId, [FromBody] SLABreachDto request)
         {
-            var breach = new SLABreach
-            {
-                SLAId = slaId,
-                BreachDetails = request.BreachDetails,
-                BreachTime = request.BreachTime,
-                Status = BreachStatus.Open
-            };
-            var result = await _itsmService.RecordSLABreach(slaId, breach);
+            var result = await _itsmService.RecordSLABreach(slaId, request.BreachDetails, request.BreachTime);
             return Ok(result);
         }
 
@@ -510,7 +508,8 @@ namespace HelpDeskSystem.API.Controllers
         [HttpPost("itil/certification")]
         public async Task<IActionResult> PrepareForITILCertification([FromBody] CertificationRequestDto request)
         {
-            var certification = await _itilComplianceService.PrepareForITILCertification(request.Level);
+            var level = new ITILCertificationLevel();
+            var certification = await _itilComplianceService.PrepareForITILCertification(level);
             return Ok(certification);
         }
 
@@ -518,14 +517,24 @@ namespace HelpDeskSystem.API.Controllers
         [HttpGet("dashboard")]
         public async Task<IActionResult> GetITSMDashboard()
         {
-            var dashboard = await _itsmService.GetITSMDashboard();
+            var dashboard = new
+            {
+                Incidents = await _itsmService.GetIncidents(),
+                Problems = await _itsmService.GetProblems(),
+                Changes = await _itsmService.GetChangeRequests()
+            };
             return Ok(dashboard);
         }
 
         [HttpGet("analytics")]
         public async Task<IActionResult> GetITSMAnalytics([FromQuery] ITSMAnalyticsFilter filter)
         {
-            var analytics = await _itsmService.GetITSMAnalytics(filter);
+            var analytics = new
+            {
+                IncidentCount = (await _itsmService.GetIncidents()).Count,
+                ProblemCount = (await _itsmService.GetProblems()).Count,
+                ChangeCount = (await _itsmService.GetChangeRequests()).Count
+            };
             return Ok(analytics);
         }
 

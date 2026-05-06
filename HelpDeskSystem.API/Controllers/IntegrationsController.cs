@@ -81,6 +81,61 @@ public class IntegrationsController : ControllerBase
         return Ok(apps);
     }
 
+    [HttpGet("templates")]
+    public ActionResult<IEnumerable<object>> GetIntegrationTemplates()
+    {
+        var templates = new[]
+        {
+            new
+            {
+                key = "slack",
+                category = "chat",
+                displayName = "Slack",
+                authMode = "signing_secret",
+                requiredConfig = new[] { "signingSecret", "botToken" },
+                inboundEndpointPattern = "/api/omnichannel/inbound/{connectorId}/webhook"
+            },
+            new
+            {
+                key = "meta_whatsapp",
+                category = "whatsapp",
+                displayName = "WhatsApp Cloud API",
+                authMode = "hmac_sha256",
+                requiredConfig = new[] { "appSecret", "verifyToken", "phoneNumberId" },
+                inboundEndpointPattern = "/api/omnichannel/inbound/{connectorId}/webhook"
+            },
+            new
+            {
+                key = "twilio",
+                category = "voice_sms",
+                displayName = "Twilio Voice/SMS/WhatsApp",
+                authMode = "twilio_signature",
+                requiredConfig = new[] { "authToken", "accountSid" },
+                inboundEndpointPattern = "/api/omnichannel/inbound/{connectorId}/webhook"
+            },
+            new
+            {
+                key = "cti",
+                category = "voice",
+                displayName = "Generic CTI",
+                authMode = "shared_secret",
+                requiredConfig = new[] { "sharedSecret" },
+                inboundEndpointPattern = "/api/omnichannel/inbound/{connectorId}/webhook"
+            },
+            new
+            {
+                key = "webchat",
+                category = "chat",
+                displayName = "Web Chat Widget",
+                authMode = "none_or_jwt",
+                requiredConfig = new[] { "widgetId" },
+                inboundEndpointPattern = "/api/omnichannel/inbound/{connectorId}/webhook"
+            }
+        };
+
+        return Ok(templates);
+    }
+
     [HttpPost("marketplace/catalog")]
     [Authorize(Roles = "SuperAdmin")]
     public async Task<ActionResult<MarketplaceApp>> UpsertMarketplaceCatalogItem([FromBody] UpsertMarketplaceAppRequest request)

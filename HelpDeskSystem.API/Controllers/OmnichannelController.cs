@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using HelpDeskSystem.API.Security;
+using HelpDeskSystem.API.Services;
 using HelpDeskSystem.Application.DTOs.Tickets;
 using HelpDeskSystem.Application.Interfaces;
 using HelpDeskSystem.Domain.Entities;
@@ -9,6 +10,7 @@ using HelpDeskSystem.Domain.Enums;
 using HelpDeskSystem.Persistence.Context;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace HelpDeskSystem.API.Controllers;
@@ -19,11 +21,16 @@ public class OmnichannelController : ControllerBase
 {
     private readonly HelpDeskDbContext _context;
     private readonly ITicketService _ticketService;
+    private readonly IOmnichannelInboundNormalizationService _normalizationService;
 
-    public OmnichannelController(HelpDeskDbContext context, ITicketService ticketService)
+    public OmnichannelController(
+        HelpDeskDbContext context,
+        ITicketService ticketService,
+        IOmnichannelInboundNormalizationService normalizationService)
     {
         _context = context;
         _ticketService = ticketService;
+        _normalizationService = normalizationService;
     }
 
     [HttpGet("connectors")]
@@ -81,8 +88,9 @@ public class OmnichannelController : ControllerBase
     }
 
     [HttpPost("inbound/{connectorId:int}")]
+    [EnableRateLimiting("omnichannel-webhook")]
     [AllowAnonymous]
-    public async Task<ActionResult> ReceiveInbound(int connectorId, [FromBody] InboundChannelRequest request)
+    public async Task<ActionResult<object>> ReceiveInbound(int connectorId, [FromBody] InboundChannelRequest request)
     {
         var connector = await _context.OmnichannelConnectors
             .FirstOrDefaultAsync(x => x.Id == connectorId && !x.IsDeleted, HttpContext.RequestAborted);
@@ -216,6 +224,62 @@ public class OmnichannelController : ControllerBase
         }
 
         return Accepted(new { inbound.Id, inbound.Status, inbound.CreatedTicketId });
+    }
+
+    [HttpPost("inbound/{connectorId:int}/webhook")]
+    [EnableRateLimiting("omnichannel-webhook")]
+    [AllowAnonymous]
+    public async Task<ActionResult<object>> ReceiveWebhookInbound(int connectorId, [FromBody] JsonElement payload)
+    {
+        var connector = await _context.OmnichannelConnectors
+            .FirstOrDefaultAsync(x => x.Id == connectorId && !x.IsDeleted, HttpContext.RequestAborted);
+        if (connector == null || connector.Status != ConnectorStatus.Enabled)
+            return NotFound();
+
+        Request.EnableBuffering();
+        string rawBody;
+        using (var reader = new StreamReader(Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true))
+        {
+            rawBody = await reader.ReadToEndAsync(HttpContext.RequestAborted);
+            Request.Body.Position = 0;
+        }
+
+        var normalized = await _normalizationService.NormalizeAsync(connector, Request, payload, rawBody, HttpContext.RequestAborted);
+        if (!normalized.IsValid)
+            return BadRequest(new { error = normalized.Error });
+
+        var typed = new InboundChannelRequest
+        {
+            ExternalConversationId = normalized.ExternalConversationId,
+            ExternalMessageId = normalized.ExternalMessageId,
+            SenderAddress = normalized.SenderAddress,
+            Subject = normalized.Subject,
+            Content = normalized.Content,
+            ExternalTimestampUtc = normalized.ExternalTimestampUtc
+        };
+
+        var result = await ReceiveInbound(connectorId, typed);
+        if (result.Result is ObjectResult objectResult && objectResult.Value is not null)
+        {
+            return objectResult.StatusCode.HasValue
+                ? StatusCode(objectResult.StatusCode.Value, new
+                {
+                    objectResult.Value,
+                    normalized = JsonSerializer.Deserialize<object>(normalized.NormalizedPayloadJson)
+                })
+                : Ok(new { objectResult.Value, normalized = JsonSerializer.Deserialize<object>(normalized.NormalizedPayloadJson) });
+        }
+
+        if (result.Value is not null)
+        {
+            return Ok(new
+            {
+                result.Value,
+                normalized = JsonSerializer.Deserialize<object>(normalized.NormalizedPayloadJson)
+            });
+        }
+
+        return Accepted();
     }
 
     [HttpGet("events")]

@@ -20,6 +20,14 @@ public class Ticket : BaseEntity
     public int SlaPausedTotalMinutes { get; set; }
     public int TenantId { get; set; }
 
+    // Customer satisfaction
+    public int? CsatRating { get; set; }          // 1-5 star rating
+    public string? CsatComment { get; set; }
+    public DateTime? CsatSubmittedAtUtc { get; set; }
+
+    // Omnichannel source
+    public string? SourceChannel { get; set; }    // "email", "portal", "whatsapp", "slack", "api"
+
     // Navigation properties
     public TicketCategory? Category { get; set; }
     public TicketPriority? Priority { get; set; }

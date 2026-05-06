@@ -341,7 +341,7 @@ namespace HelpDeskSystem.API.Controllers
                 Description = request.Description,
                 RiskCategory = request.RiskCategory,
                 InherentRisk = request.InherentRisk,
-                RiskFactors = request.RiskFactors,
+                RiskFactors = request.RiskFactors.Select(f => new RiskFactor { Description = f }).ToList(),
                 Controls = request.Controls
             };
             var result = await _enterpriseService.CreateRiskAssessment(assessment);
@@ -357,7 +357,7 @@ namespace HelpDeskSystem.API.Controllers
                 Description = request.Description,
                 RiskCategory = request.RiskCategory,
                 InherentRisk = request.InherentRisk,
-                RiskFactors = request.RiskFactors,
+                RiskFactors = request.RiskFactors.Select(f => new RiskFactor { Description = f }).ToList(),
                 Controls = request.Controls
             };
             var result = await _enterpriseService.UpdateRiskAssessment(assessmentId, assessment);

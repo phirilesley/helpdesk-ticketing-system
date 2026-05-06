@@ -2,14 +2,20 @@
   <Project Path="HelpDeskSystem.API/HelpDeskSystem.API.csproj" />
   <Project Path="HelpDeskSystem.Application/HelpDeskSystem.Application.csproj" />
   <Project Path="HelpDeskSystem.Auditing/HelpDeskSystem.Auditing.csproj" />
+  <Project Path="HelpDeskSystem.DevOps/HelpDeskSystem.DevOps.csproj" />
   <Project Path="HelpDeskSystem.Domain/HelpDeskSystem.Domain.csproj" />
+  <Project Path="HelpDeskSystem.Enterprise/HelpDeskSystem.Enterprise.csproj" />
   <Project Path="HelpDeskSystem.Files/HelpDeskSystem.Files.csproj" />
   <Project Path="HelpDeskSystem.Infrastructure/HelpDeskSystem.Infrastructure.csproj" />
+  <Project Path="HelpDeskSystem.ITSM/HelpDeskSystem.ITSM.csproj" />
+  <Project Path="HelpDeskSystem.Marketing/HelpDeskSystem.Marketing.csproj" />
   <Project Path="HelpDeskSystem.Notifications/HelpDeskSystem.Notifications.csproj" />
   <Project Path="HelpDeskSystem.Persistence/HelpDeskSystem.Persistence.csproj" />
   <Project Path="HelpDeskSystem.Realtime/HelpDeskSystem.Realtime.csproj" />
   <Project Path="HelpDeskSystem.Reporting/HelpDeskSystem.Reporting.csproj" />
+  <Project Path="HelpDeskSystem.Scaling/HelpDeskSystem.Scaling.csproj" />
   <Project Path="HelpDeskSystem.Shared/HelpDeskSystem.Shared.csproj" />
   <Project Path="HelpDeskSystem.SLA/HelpDeskSystem.SLA.csproj" />
+  <Project Path="HelpDeskSystem.Tests/HelpDeskSystem.Tests.csproj" />
   <Project Path="HelpDeskSystem.Workflow/HelpDeskSystem.Workflow.csproj" />
 </Solution>

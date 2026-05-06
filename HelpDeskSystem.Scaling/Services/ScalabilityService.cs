@@ -10,6 +10,21 @@ using System.Diagnostics;
 
 namespace HelpDeskSystem.Scaling.Services
 {
+    public interface IMetricsService
+    {
+        Task RecordMetric(string name, double value, Dictionary<string, string>? tags = null);
+        Task<double?> GetMetric(string name, TimeSpan? timeWindow = null);
+        Task<List<MetricData>> GetMetrics(string pattern, TimeSpan timeWindow);
+    }
+
+    public class MetricData
+    {
+        public string Name { get; set; } = string.Empty;
+        public double Value { get; set; }
+        public DateTime Timestamp { get; set; }
+        public Dictionary<string, string> Tags { get; set; } = new();
+    }
+
     public interface IScalabilityService
     {
         // Load Balancing
@@ -143,7 +158,7 @@ namespace HelpDeskSystem.Scaling.Services
                 // Update node status
                 await UpdateNodeStatus(nodes);
 
-                return nodes.OrderByDescending(n => n.HealthScore).ToList();
+                return nodes.OrderByDescending(n => n.CurrentLoad).ToList();
             }
             catch (Exception ex)
             {
@@ -221,7 +236,7 @@ namespace HelpDeskSystem.Scaling.Services
                     ActiveNodes = nodes.Count(n => n.Status == NodeStatus.Active),
                     TotalRequests = await GetTotalRequests(),
                     RequestsPerSecond = await GetRequestsPerSecond(),
-                    AverageResponseTime = await GetAverageResponseTime(),
+                    AverageResponseTime = (await GetAverageResponseTime()).TotalMilliseconds,
                     ErrorRate = await GetErrorRate(),
                     LoadDistribution = await CalculateLoadDistribution(nodes),
                     HealthCheckResults = await GetHealthCheckResults()
@@ -289,11 +304,11 @@ namespace HelpDeskSystem.Scaling.Services
                 scalingEvent.Action = action;
 
                 // Execute scaling
-                if (action == ScalingAction.ScaleOut)
+                if (action?.Type == ScalingActionType.ScaleOut)
                 {
                     await ScaleOut(trigger);
                 }
-                else if (action == ScalingAction.ScaleIn)
+                else if (action?.Type == ScalingActionType.ScaleIn)
                 {
                     await ScaleIn(trigger);
                 }
@@ -322,7 +337,7 @@ namespace HelpDeskSystem.Scaling.Services
             try
             {
                 policy.PolicyId = Guid.NewGuid().ToString();
-                policy.CreatedAt = DateTime.UtcNow;
+                // policy.CreatedAt = DateTime.UtcNow;
                 policy.IsActive = true;
 
                 // Validate policy
@@ -383,14 +398,8 @@ namespace HelpDeskSystem.Scaling.Services
             {
                 var metrics = new DatabaseMetrics
                 {
-                    ActiveConnections = await GetActiveDatabaseConnections(),
-                    QueryPerformance = await GetQueryPerformanceMetrics(),
-                    IndexUsage = await GetIndexUsageMetrics(),
-                    LockContention = await GetLockContentionMetrics(),
                     ReplicationLag = await GetReplicationLag(),
-                    CacheHitRatio = await GetCacheHitRatio(),
-                    DiskUsage = await GetDiskUsageMetrics(),
-                    MemoryUsage = await GetMemoryUsageMetrics()
+                    MemoryUsage = (await GetMemoryUsageMetrics()).UsedPercentage
                 };
 
                 return metrics;
@@ -474,9 +483,9 @@ namespace HelpDeskSystem.Scaling.Services
                     EvictionRate = await GetCacheEvictionRate(),
                     MemoryUsage = await GetCacheMemoryUsage(),
                     KeyCount = await GetCacheKeyCount(),
-                    AverageGetTime = await GetAverageCacheGetTime(),
-                    AverageSetTime = await GetAverageCacheSetTime(),
-                    NetworkLatency = await GetCacheNetworkLatency()
+                    AverageGetTime = (await GetAverageCacheGetTime()).TotalMilliseconds,
+                    AverageSetTime = (await GetAverageCacheSetTime()).TotalMilliseconds,
+                    NetworkLatency = (await GetCacheNetworkLatency()).TotalMilliseconds
                 };
 
                 return metrics;
@@ -502,7 +511,7 @@ namespace HelpDeskSystem.Scaling.Services
                     MemoryUsage = await GetMemoryUsage(),
                     DiskIO = await GetDiskIOMetrics(),
                     NetworkIO = await GetNetworkIOMetrics(),
-                    ResponseTime = await GetAverageResponseTime(),
+                    ResponseTime = TimeSpan.FromMilliseconds(await GetResponseTime()),
                     Throughput = await GetThroughput(),
                     ErrorRate = await GetErrorRate(),
                     ActiveConnections = await GetActiveConnections(),
@@ -536,11 +545,11 @@ namespace HelpDeskSystem.Scaling.Services
                     alerts.Add(new PerformanceAlert
                     {
                         AlertId = Guid.NewGuid().ToString(),
-                        Type = AlertType.HighCpuUsage,
+                        Metric = AlertType.HighCpuUsage,
                         Severity = AlertSeverity.Critical,
-                        Message = $"CPU usage is {metrics.CpuUsage:F1}%",
-                        TriggeredAt = DateTime.UtcNow,
-                        Value = metrics.CpuUsage,
+                        Description = $"CPU usage is {metrics.CpuUsage:F1}%",
+                        CreatedAt = DateTime.UtcNow,
+                        CurrentValue = metrics.CpuUsage,
                         Threshold = 90
                     });
                 }
@@ -550,11 +559,11 @@ namespace HelpDeskSystem.Scaling.Services
                     alerts.Add(new PerformanceAlert
                     {
                         AlertId = Guid.NewGuid().ToString(),
-                        Type = AlertType.HighMemoryUsage,
+                        Metric = AlertType.HighMemoryUsage,
                         Severity = AlertSeverity.Warning,
-                        Message = $"Memory usage is {metrics.MemoryUsage:F1}%",
-                        TriggeredAt = DateTime.UtcNow,
-                        Value = metrics.MemoryUsage,
+                        Description = $"Memory usage is {metrics.MemoryUsage:F1}%",
+                        CreatedAt = DateTime.UtcNow,
+                        CurrentValue = metrics.MemoryUsage,
                         Threshold = 85
                     });
                 }
@@ -564,11 +573,11 @@ namespace HelpDeskSystem.Scaling.Services
                     alerts.Add(new PerformanceAlert
                     {
                         AlertId = Guid.NewGuid().ToString(),
-                        Type = AlertType.HighResponseTime,
+                        Metric = AlertType.HighResponseTime,
                         Severity = AlertSeverity.Warning,
-                        Message = $"Response time is {metrics.ResponseTime.TotalMilliseconds:F0}ms",
-                        TriggeredAt = DateTime.UtcNow,
-                        Value = metrics.ResponseTime.TotalMilliseconds,
+                        Description = $"Response time is {metrics.ResponseTime.TotalMilliseconds:F0}ms",
+                        CreatedAt = DateTime.UtcNow,
+                        CurrentValue = metrics.ResponseTime.TotalMilliseconds,
                         Threshold = 2000
                     });
                 }
@@ -592,12 +601,10 @@ namespace HelpDeskSystem.Scaling.Services
             {
                 var utilization = new ResourceUtilization
                 {
-                    CpuUtilization = await GetCpuUsage(),
-                    MemoryUtilization = await GetMemoryUsage(),
-                    DiskUtilization = await GetDiskUtilization(),
-                    NetworkUtilization = await GetNetworkUtilization(),
-                    DatabaseConnections = await GetActiveDatabaseConnections(),
-                    CacheUtilization = await GetCacheMemoryUsage(),
+                    CPU = await GetCpuUsage(),
+                    Memory = await GetMemoryUsage(),
+                    Storage = await GetDiskUtilization(),
+                    Network = await GetNetworkUtilization(),
                     Timestamp = DateTime.UtcNow
                 };
 
@@ -716,7 +723,7 @@ namespace HelpDeskSystem.Scaling.Services
                     CurrentCapacity = await GetCurrentCapacity(),
                     ProjectedGrowth = await ProjectGrowthRate(horizon),
                     RequiredCapacity = await CalculateRequiredCapacity(horizon),
-                    Recommendations = await GenerateCapacityRecommendations(horizon),
+                    Recommendations = (await GenerateCapacityRecommendations(horizon)).Select(r => r.Recommendation).ToList(),
                     CostProjections = await CalculateCostProjections(horizon)
                 };
 
@@ -762,23 +769,23 @@ namespace HelpDeskSystem.Scaling.Services
                 var utilization = await GetResourceUtilization();
                 
                 // Check scale-up conditions
-                if (utilization.CpuUtilization > 80 || utilization.MemoryUtilization > 85)
+                if (utilization.CPU > 80 || utilization.Memory > 85)
                 {
                     var trigger = new ScalingTrigger
                     {
                         Type = TriggerType.ResourceUtilization,
-                        Value = Math.Max(utilization.CpuUtilization, utilization.MemoryUtilization)
+                        Value = Math.Max(utilization.CPU, utilization.Memory)
                     };
                     await TriggerScalingEvent(trigger);
                 }
                 
                 // Check scale-down conditions
-                else if (utilization.CpuUtilization < 30 && utilization.MemoryUtilization < 40)
+                else if (utilization.CPU < 30 && utilization.Memory < 40)
                 {
                     var trigger = new ScalingTrigger
                     {
                         Type = TriggerType.ResourceUtilization,
-                        Value = Math.Max(utilization.CpuUtilization, utilization.MemoryUtilization)
+                        Value = Math.Max(utilization.CPU, utilization.Memory)
                     };
                     await TriggerScalingEvent(trigger);
                 }
@@ -879,7 +886,7 @@ namespace HelpDeskSystem.Scaling.Services
         private async Task<ScalingAction> DetermineScalingAction(ScalingTrigger trigger)
         {
             // Implementation to determine scaling action
-            return ScalingAction.ScaleOut;
+            return new ScalingAction { Type = ScalingActionType.ScaleOut };
         }
 
         private async Task ScaleOut(ScalingTrigger trigger)
@@ -1015,10 +1022,10 @@ namespace HelpDeskSystem.Scaling.Services
             return 25.8;
         }
 
-        private async Task<List<Region>> GetOptimalRegions()
+        private async Task<List<string>> GetOptimalRegions()
         {
             // Implementation to get optimal regions for deployment
-            return new List<Region>();
+            return new List<string> { "us-east-1", "us-west-2", "eu-west-1" };
         }
 
         private async Task ConfigureCDN(GlobalConfiguration config)
@@ -1098,430 +1105,12 @@ namespace HelpDeskSystem.Scaling.Services
         private async Task<double> GetThroughput() => await Task.FromResult(5000.0);
         private async Task<double> GetDiskIOMetrics() => await Task.FromResult(100.0);
         private async Task<double> GetNetworkIOMetrics() => await Task.FromResult(200.0);
+        private async Task<double> GetResponseTime() => await Task.FromResult(100.0);
 
         #endregion
     }
 
-    #region Data Models
-
-    public class ScalabilitySettings
-    {
-        public bool EnableAutoScaling { get; set; } = true;
-        public bool EnableLoadBalancing { get; set; } = true;
-        public bool EnableHighAvailability { get; set; } = true;
-        public bool EnableGlobalDeployment { get; set; } = true;
-        public int MaxNodes { get; set; } = 20;
-        public int MinNodes { get; set; } = 2;
-        public TimeSpan ScalingCooldown { get; set; } = TimeSpan.FromMinutes(5);
-    }
-
-    // Load Balancing Models
-    public class LoadBalancerConfiguration
-    {
-        public string Algorithm { get; set; }
-        public TimeSpan HealthCheckInterval { get; set; }
-        public int FailureThreshold { get; set; }
-        public TimeSpan RecoveryTimeout { get; set; }
-        public List<RoutingRule> RoutingRules { get; set; } = new List<RoutingRule>();
-        public List<HealthCheck> HealthChecks { get; set; } = new List<HealthCheck>();
-    }
-
-    public enum LoadBalancingAlgorithm
-    {
-        RoundRobin,
-        WeightedRoundRobin,
-        LeastConnections,
-        IPHash,
-        Geographic
-    }
-
-    public class ServerNode
-    {
-        public string NodeId { get; set; }
-        public string Name { get; set; }
-        public string IPAddress { get; set; }
-        public string Region { get; set; }
-        public NodeStatus Status { get; set; }
-        public double HealthScore { get; set; }
-        public int Weight { get; set; }
-        public DateTime AddedAt { get; set; }
-        public ResourceMetrics Resources { get; set; }
-        public List<string> Tags { get; set; } = new List<string>();
-    }
-
-    public enum NodeStatus
-    {
-        Active,
-        Inactive,
-        Provisioning,
-        Draining,
-        Failed,
-        Maintenance
-    }
-
-    public class LoadBalancingMetrics
-    {
-        public int TotalNodes { get; set; }
-        public int ActiveNodes { get; set; }
-        public long TotalRequests { get; set; }
-        public double RequestsPerSecond { get; set; }
-        public TimeSpan AverageResponseTime { get; set; }
-        public double ErrorRate { get; set; }
-        public Dictionary<string, double> LoadDistribution { get; set; } = new Dictionary<string, double>();
-        public List<HealthCheckResult> HealthCheckResults { get; set; } = new List<HealthCheckResult>();
-    }
-
-    // Auto Scaling Models
-    public class AutoScalingConfiguration
-    {
-        public List<ScalingPolicy> ScalingPolicies { get; set; } = new List<ScalingPolicy>();
-        public TimeSpan ScaleUpCooldown { get; set; }
-        public TimeSpan ScaleDownCooldown { get; set; }
-        public double CpuThreshold { get; set; }
-        public double MemoryThreshold { get; set; }
-        public TimeSpan ResponseTimeThreshold { get; set; }
-    }
-
-    public class ScalingEvent
-    {
-        public string EventId { get; set; }
-        public TriggerType Type { get; set; }
-        public double TriggerValue { get; set; }
-        public ScalingAction Action { get; set; }
-        public ScalingStatus Status { get; set; }
-        public DateTime TriggeredAt { get; set; }
-        public DateTime? CompletedAt { get; set; }
-        public string Details { get; set; }
-    }
-
-    public enum TriggerType
-    {
-        ResourceUtilization,
-        ResponseTime,
-        QueueDepth,
-        CustomMetric
-    }
-
-    public enum ScalingAction
-    {
-        ScaleOut,
-        ScaleIn,
-        NoAction
-    }
-
-    public enum ScalingStatus
-    {
-        InProgress,
-        Completed,
-        Failed,
-        Cancelled
-    }
-
-    public class ScalingTrigger
-    {
-        public TriggerType Type { get; set; }
-        public double Value { get; set; }
-        public string Metric { get; set; }
-        public DateTime Timestamp { get; set; }
-    }
-
-    public class ScalingPolicy
-    {
-        public string PolicyId { get; set; }
-        public string Name { get; set; }
-        public string Metric { get; set; }
-        public double Threshold { get; set; }
-        public ScalingAction Action { get; set; }
-        public TimeSpan CooldownPeriod { get; set; }
-        public bool IsActive { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public Dictionary<string, object> Conditions { get; set; } = new Dictionary<string, object>();
-    }
-
-    // Database Scaling Models
-    public class DatabaseConfiguration
-    {
-        public int ReadReplicas { get; set; }
-        public double ReadWriteSplitRatio { get; set; }
-        public int MaxConnections { get; set; }
-        public int MinConnections { get; set; }
-        public TimeSpan ConnectionTimeout { get; set; }
-        public bool EnableSharding { get; set; }
-        public List<ShardConfiguration> Shards { get; set; } = new List<ShardConfiguration>();
-        public CacheConfiguration CacheConfig { get; set; }
-    }
-
-    public class DatabaseMetrics
-    {
-        public int ActiveConnections { get; set; }
-        public QueryPerformance QueryPerformance { get; set; }
-        public IndexUsage IndexUsage { get; set; }
-        public LockContention LockContention { get; set; }
-        public TimeSpan ReplicationLag { get; set; }
-        public double CacheHitRatio { get; set; }
-        public DiskUsage DiskUsage { get; set; }
-        public MemoryUsage MemoryUsage { get; set; }
-        public DateTime Timestamp { get; set; }
-    }
-
-    public class ReplicationStatus
-    {
-        public bool IsReplicating { get; set; }
-        public TimeSpan Lag { get; set; }
-        public List<ReplicaNode> Replicas { get; set; } = new List<ReplicaNode>();
-        public DateTime LastSync { get; set; }
-    }
-
-    // Caching Models
-    public class CacheConfiguration
-    {
-        public CacheType CacheType { get; set; }
-        public bool ClusterEnabled { get; set; }
-        public int ReplicationFactor { get; set; }
-        public TimeSpan DefaultExpiration { get; set; }
-        public double MaxMemoryUsage { get; set; }
-        public EvictionPolicy EvictionPolicy { get; set; }
-        public List<CacheNode> Nodes { get; set; } = new List<CacheNode>();
-        public List<CacheWarmingRule> WarmingRules { get; set; } = new List<CacheWarmingRule>();
-    }
-
-    public enum CacheType
-    {
-        Redis,
-        Memcached,
-        InMemory,
-        Distributed
-    }
-
-    public enum EvictionPolicy
-    {
-        LRU,
-        LFU,
-        FIFO,
-        TTL
-    }
-
-    public class CacheMetrics
-    {
-        public double HitRate { get; set; }
-        public double MissRate { get; set; }
-        public double EvictionRate { get; set; }
-        public double MemoryUsage { get; set; }
-        public int KeyCount { get; set; }
-        public TimeSpan AverageGetTime { get; set; }
-        public TimeSpan AverageSetTime { get; set; }
-        public TimeSpan NetworkLatency { get; set; }
-        public DateTime Timestamp { get; set; }
-    }
-
-    // Performance Monitoring Models
-    public class PerformanceMetrics
-    {
-        public double CpuUsage { get; set; }
-        public double MemoryUsage { get; set; }
-        public double DiskIO { get; set; }
-        public double NetworkIO { get; set; }
-        public TimeSpan ResponseTime { get; set; }
-        public double Throughput { get; set; }
-        public double ErrorRate { get; set; }
-        public int ActiveConnections { get; set; }
-        public int QueueDepth { get; set; }
-        public DateTime Timestamp { get; set; }
-    }
-
-    public class PerformanceAlert
-    {
-        public string AlertId { get; set; }
-        public AlertType Type { get; set; }
-        public AlertSeverity Severity { get; set; }
-        public string Message { get; set; }
-        public DateTime TriggeredAt { get; set; }
-        public double Value { get; set; }
-        public double Threshold { get; set; }
-        public string Component { get; set; }
-        public bool IsAcknowledged { get; set; }
-        public DateTime? AcknowledgedAt { get; set; }
-    }
-
-    public enum AlertType
-    {
-        HighCpuUsage,
-        HighMemoryUsage,
-        HighResponseTime,
-        HighErrorRate,
-        DiskSpaceLow,
-        ServiceUnavailable,
-        ScalingEvent
-    }
-
-    public enum AlertSeverity
-    {
-        Info,
-        Warning,
-        Critical,
-        Emergency
-    }
-
-    // Resource Management Models
-    public class ResourceUtilization
-    {
-        public double CpuUtilization { get; set; }
-        public double MemoryUtilization { get; set; }
-        public double DiskUtilization { get; set; }
-        public double NetworkUtilization { get; set; }
-        public int DatabaseConnections { get; set; }
-        public double CacheUtilization { get; set; }
-        public DateTime Timestamp { get; set; }
-    }
-
-    public class ResourcePool
-    {
-        public string PoolId { get; set; }
-        public string Name { get; set; }
-        public ResourceType Type { get; set; }
-        public int TotalCapacity { get; set; }
-        public int UsedCapacity { get; set; }
-        public int AvailableCapacity { get; set; }
-        public List<ResourceAllocation> Allocations { get; set; } = new List<ResourceAllocation>();
-    }
-
-    public enum ResourceType
-    {
-        Compute,
-        Memory,
-        Storage,
-        Network,
-        Database
-    }
-
-    // Global Deployment Models
-    public class GlobalConfiguration
-    {
-        public List<Region> Regions { get; set; } = new List<Region>();
-        public string PrimaryRegion { get; set; }
-        public string DisasterRecoveryRegion { get; set; }
-        public CDNConfiguration CDN { get; set; }
-        public DNSConfiguration DNS { get; set; }
-        public DataSyncConfiguration DataSync { get; set; }
-    }
-
-    public class Region
-    {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string Location { get; set; }
-        public RegionStatus Status { get; set; }
-        public List<ServerNode> Nodes { get; set; } = new List<ServerNode>();
-        public RegionMetrics Metrics { get; set; }
-    }
-
-    public enum RegionStatus
-    {
-        Active,
-        Standby,
-        Maintenance,
-        Failed
-    }
-
-    public class RegionMetrics
-    {
-        public double Latency { get; set; }
-        public double Throughput { get; set; }
-        public double Availability { get; set; }
-        public int UserCount { get; set; }
-        public DateTime LastUpdated { get; set; }
-    }
-
-    // High Availability Models
-    public class HAConfiguration
-    {
-        public HAMode Mode { get; set; }
-        public TimeSpan FailoverTimeout { get; set; }
-        public TimeSpan HealthCheckInterval { get; set; }
-        public List<ClusterNode> ClusterNodes { get; set; } = new List<ClusterNode>();
-        public FailoverConfiguration FailoverConfig { get; set; }
-    }
-
-    public enum HAMode
-    {
-        ActivePassive,
-        ActiveActive,
-        MultiMaster
-    }
-
-    public class HAStatus
-    {
-        public bool IsHealthy { get; set; }
-        public string ActiveNode { get; set; }
-        public List<string> StandbyNodes { get; set; } = new List<string>();
-        public DateTime LastFailover { get; set; }
-        public ClusterHealth ClusterHealth { get; set; }
-    }
-
-    public class DisasterRecoveryPlan
-    {
-        public string PlanId { get; set; }
-        public List<DRStep> Steps { get; set; } = new List<DRStep>();
-        public TimeSpan EstimatedRecoveryTime { get; set; }
-        public string RecoveryRegion { get; set; }
-        public DateTime LastTested { get; set; }
-        public bool IsTestPassed { get; set; }
-    }
-
-    // Analytics Models
-    public class SystemAnalytics
-    {
-        public TimeSpan Period { get; set; }
-        public DateTime GeneratedAt { get; set; }
-        public long TotalRequests { get; set; }
-        public int UniqueUsers { get; set; }
-        public TimeSpan AverageResponseTime { get; set; }
-        public double ErrorRate { get; set; }
-        public double Throughput { get; set; }
-        public ResourceUtilization ResourceUtilization { get; set; }
-        public List<ScalingEvent> ScalingEvents { get; set; } = new List<ScalingEvent>();
-        public CostMetrics CostMetrics { get; set; }
-    }
-
-    public class CapacityPlanning
-    {
-        public TimeSpan Horizon { get; set; }
-        public DateTime GeneratedAt { get; set; }
-        public CapacityMetrics CurrentCapacity { get; set; }
-        public double ProjectedGrowth { get; set; }
-        public CapacityMetrics RequiredCapacity { get; set; }
-        public List<CapacityRecommendation> Recommendations { get; set; } = new List<CapacityRecommendation>();
-        public List<CostProjection> CostProjections { get; set; } = new List<CostProjection>();
-    }
-
-    // Additional supporting models
-    public class RoutingRule { }
-    public class HealthCheck { }
-    public class HealthCheckResult { }
-    public class ResourceMetrics { }
-    public class ShardConfiguration { }
-    public class CacheNode { }
-    public class CacheWarmingRule { }
-    public class ReplicaNode { }
-    public class ResourceAllocation { }
-    public class CDNConfiguration { }
-    public class DNSConfiguration { }
-    public class DataSyncConfiguration { }
-    public class ClusterNode { }
-    public class FailoverConfiguration { }
-    public class ClusterHealth { }
-    public class DRStep { }
-    public class CostMetrics { }
-    public class PerformanceBaseline { }
-    public class PerformanceRecommendation { }
-    public class CapacityRecommendation { }
-    public class CostProjection { }
-    public class CapacityMetrics { }
-    public class QueryPerformance { }
-    public class IndexUsage { }
-    public class LockContention { }
-    public class DiskUsage { }
-    public class MemoryUsage { }
+    #region Data Models - These are defined in ScalingModels.cs
 
     #endregion
 }

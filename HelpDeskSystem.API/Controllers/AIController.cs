@@ -1,5 +1,5 @@
-using HelpDeskSystem.AI.Services;
 using HelpDeskSystem.API.Security;
+using HelpDeskSystem.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,93 +7,86 @@ namespace HelpDeskSystem.API.Controllers;
 
 [ApiController]
 [Authorize]
-[Route("api/[controller]")]
-public class AIController : ControllerBase
+[Route("api/ai")]
+public class AiController : ControllerBase
 {
-    private readonly ITicketCategorizationService _categorizationService;
-    private readonly ILogger<AIController> _logger;
+    private readonly IAiTriageService _aiService;
 
-    public AIController(
-        ITicketCategorizationService categorizationService,
-        ILogger<AIController> logger)
+    public AiController(IAiTriageService aiService)
     {
-        _categorizationService = categorizationService;
-        _logger = logger;
+        _aiService = aiService;
     }
 
-    [HttpPost("categorize")]
-    public async Task<ActionResult<TicketCategorizationResult>> CategorizeTicket([FromBody] Application.DTOs.Tickets.CreateTicketDto ticketDto)
-    {
-        try
-        {
-            var result = await _categorizationService.CategorizeTicketAsync(ticketDto);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error categorizing ticket");
-            return StatusCode(500, "Error categorizing ticket");
-        }
-    }
-
-    [HttpPost("suggest-agent/{ticketId}")]
-    public async Task<ActionResult<AgentSuggestionResult>> SuggestAgent(int ticketId)
-    {
-        try
-        {
-            var result = await _categorizationService.SuggestAgentAsync(ticketId);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error suggesting agent for ticket {TicketId}", ticketId);
-            return StatusCode(500, "Error suggesting agent");
-        }
-    }
-
-    [HttpPost("suggest-response/{ticketId}")]
-    public async Task<ActionResult<ResponseSuggestionResult>> SuggestResponse(int ticketId)
-    {
-        try
-        {
-            var result = await _categorizationService.GenerateResponseSuggestionAsync(ticketId);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating response suggestion for ticket {TicketId}", ticketId);
-            return StatusCode(500, "Error generating response suggestion");
-        }
-    }
-
-    [HttpPost("analyze-sentiment")]
-    public async Task<ActionResult<SentimentAnalysisResult>> AnalyzeSentiment([FromBody] string content)
-    {
-        try
-        {
-            var result = await _categorizationService.AnalyzeSentimentAsync(content);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error analyzing sentiment");
-            return StatusCode(500, "Error analyzing sentiment");
-        }
-    }
-
-    [HttpPost("auto-assign/{ticketId}")]
+    /// <summary>
+    /// Analyze a ticket and suggest category, priority, assignee, and sentiment.
+    /// Matches Zendesk AI triage and Freshdesk Freddy Intelligence.
+    /// </summary>
+    [HttpPost("tickets/{ticketId}/triage")]
     [Authorize(Roles = "Agent,Admin,SuperAdmin")]
-    public async Task<ActionResult<bool>> AutoAssignTicket(int ticketId)
+    public async Task<IActionResult> TriageTicket(int ticketId)
     {
-        try
-        {
-            var result = await _categorizationService.AutoAssignTicketAsync(ticketId);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error auto-assigning ticket {TicketId}", ticketId);
-            return StatusCode(500, "Error auto-assigning ticket");
-        }
+        var tenantId = User.GetTenantId();
+        if (!tenantId.HasValue && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var result = await _aiService.TriageTicketAsync(ticketId, tenantId ?? 0);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Generate a suggested reply for a ticket based on its content and category.
+    /// </summary>
+    [HttpPost("tickets/{ticketId}/suggest-reply")]
+    [Authorize(Roles = "Agent,Admin,SuperAdmin")]
+    public async Task<IActionResult> SuggestReply(int ticketId)
+    {
+        var tenantId = User.GetTenantId();
+        if (!tenantId.HasValue && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var result = await _aiService.SuggestReplyAsync(ticketId, tenantId ?? 0);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Check for potential duplicate tickets using Jaccard similarity on titles.
+    /// </summary>
+    [HttpGet("tickets/{ticketId}/duplicates")]
+    [Authorize(Roles = "Agent,Admin,SuperAdmin")]
+    public async Task<IActionResult> FindDuplicates(int ticketId)
+    {
+        var tenantId = User.GetTenantId();
+        if (!tenantId.HasValue && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var result = await _aiService.FindDuplicatesAsync(ticketId, tenantId ?? 0);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Suggest knowledge base articles for given text (used in widget).
+    /// </summary>
+    [HttpPost("kb/suggest")]
+    public async Task<IActionResult> SuggestArticles([FromBody] AiKbSuggestRequest request)
+    {
+        var tenantId = User.GetTenantId();
+        if (!tenantId.HasValue && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var result = await _aiService.SuggestKnowledgeArticlesAsync(request.Title, request.Description, tenantId ?? 0);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Analyze sentiment of any text snippet — useful in live chat integrations.
+    /// </summary>
+    [HttpPost("sentiment")]
+    public async Task<IActionResult> AnalyzeSentiment([FromBody] AiSentimentRequest request)
+    {
+        var result = await _aiService.AnalyzeSentimentAsync(request.Text);
+        return Ok(result);
     }
 }
+
+public record AiKbSuggestRequest(string Title, string Description);
+public record AiSentimentRequest(string Text);

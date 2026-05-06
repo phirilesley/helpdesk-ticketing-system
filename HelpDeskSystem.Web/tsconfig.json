@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "es2015",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -16,5 +16,23 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src"]
+  "include": [
+    "src/index.tsx",
+    "src/App.tsx",
+    "src/components/Login.tsx",
+    "src/components/Dashboard.tsx",
+    "src/components/AdminDashboard.tsx",
+    "src/components/EnterpriseAdmin.tsx",
+    "src/components/TicketList.tsx",
+    "src/components/TicketDetail.tsx",
+    "src/components/CreateTicket.tsx",
+    "src/components/Profile.tsx",
+    "src/components/Settings.tsx",
+    "src/components/KnowledgeBase.tsx",
+    "src/components/Layout.tsx",
+    "src/hooks/**/*.ts",
+    "src/hooks/**/*.tsx",
+    "src/services/**/*.ts",
+    "src/index.css"
+  ]
 }

@@ -6,6 +6,7 @@ import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import Login from './components/Login';
+import Landing from './components/Landing';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import EnterpriseAdmin from './components/EnterpriseAdmin';
@@ -15,18 +16,35 @@ import CreateTicket from './components/CreateTicket';
 import Profile from './components/Profile';
 import Settings from './components/Settings';
 import KnowledgeBase from './components/KnowledgeBase';
+import CustomerPortal from './components/CustomerPortal';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#1976d2',
+      main: '#0f766e',
     },
     secondary: {
-      main: '#dc004e',
+      main: '#0f172a',
+    },
+    background: {
+      default: '#f4f7fb',
+      paper: '#ffffff',
     },
   },
+  shape: {
+    borderRadius: 14,
+  },
+  typography: {
+    fontFamily: '"IBM Plex Sans", "Segoe UI", sans-serif',
+    h1: { fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 },
+    h2: { fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 },
+    h3: { fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 },
+    h4: { fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 },
+    h5: { fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 },
+    h6: { fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 },
+  }
 });
 
 const queryClient = new QueryClient();
@@ -60,7 +78,7 @@ const LoginRoute: React.FC = () => {
     );
   }
 
-  return user ? <Navigate to="/dashboard" replace /> : <Login />;
+  return user ? <Navigate to="/app/dashboard" replace /> : <Login />;
 };
 
 function App() {
@@ -68,13 +86,15 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <AuthProvider>
           <Router>
+        <AuthProvider>
             <Routes>
+              <Route path="/" element={<Landing />} />
               <Route path="/login" element={<LoginRoute />} />
-              <Route path="/" element={<ProtectedLayout />}>
-                <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="/app" element={<ProtectedLayout />}>
+                <Route index element={<Navigate to="/app/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
+                <Route path="customer-portal" element={<CustomerPortal />} />
                 <Route path="admin" element={<AdminDashboard />} />
                 <Route path="enterprise" element={<EnterpriseAdmin />} />
                 <Route path="tickets" element={<TicketList />} />
@@ -84,9 +104,18 @@ function App() {
                 <Route path="settings" element={<Settings />} />
                 <Route path="knowledge-base" element={<KnowledgeBase />} />
               </Route>
+              <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
+              <Route path="/customer-portal" element={<Navigate to="/app/customer-portal" replace />} />
+              <Route path="/admin" element={<Navigate to="/app/admin" replace />} />
+              <Route path="/enterprise" element={<Navigate to="/app/enterprise" replace />} />
+              <Route path="/tickets" element={<Navigate to="/app/tickets" replace />} />
+              <Route path="/tickets/create" element={<Navigate to="/app/tickets/create" replace />} />
+              <Route path="/knowledge-base" element={<Navigate to="/app/knowledge-base" replace />} />
+              <Route path="/profile" element={<Navigate to="/app/profile" replace />} />
+              <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
             </Routes>
-          </Router>
         </AuthProvider>
+          </Router>
       </ThemeProvider>
     </QueryClientProvider>
   );

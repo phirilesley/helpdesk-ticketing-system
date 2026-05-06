@@ -45,7 +45,7 @@ import {
   Fullscreen,
   FullscreenExit,
 } from '@mui/icons-material';
-import { ForceGraph2D } from 'react-force-graph-2d';
+import ForceGraph2D from 'react-force-graph-2d';
 import axios from 'axios';
 
 interface TicketNode {
@@ -332,15 +332,15 @@ const DependencyGraph: React.FC<DependencyGraphProps> = ({
   }, [tickets]);
 
   const uniqueCategories = useMemo(() => {
-    return [...new Set(tickets.map(t => t.category))];
+    return Array.from(new Set(tickets.map(t => t.category)));
   }, [tickets]);
 
   const uniqueStatuses = useMemo(() => {
-    return [...new Set(tickets.map(t => t.status))];
+    return Array.from(new Set(tickets.map(t => t.status)));
   }, [tickets]);
 
   const uniquePriorities = useMemo(() => {
-    return [...new Set(tickets.map(t => t.priority))];
+    return Array.from(new Set(tickets.map(t => t.priority)));
   }, [tickets]);
 
   return (

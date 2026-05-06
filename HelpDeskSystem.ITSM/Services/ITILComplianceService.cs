@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using HelpDeskSystem.Application.Interfaces;
+using HelpDeskSystem.Domain.Interfaces;
 using System.Text.Json;
 using System.IO;
 using System.Text;
@@ -100,7 +101,7 @@ namespace HelpDeskSystem.ITSM.Services
         Task<DisasterRecoveryReport> GenerateDRReport(DateTime startDate, DateTime endDate);
 
         // Information Security Management (ITIL)
-        task<SecurityPolicy> CreateSecurityPolicy(SecurityPolicy policy);
+        Task<SecurityPolicy> CreateSecurityPolicy(SecurityPolicy policy);
         Task<SecurityIncident> LogSecurityIncident(SecurityIncident incident);
         Task<SecurityAssessment> ConductSecurityAssessment(SecurityAssessment assessment);
         Task<ComplianceAudit> ConductComplianceAudit(ComplianceAudit audit);
@@ -586,7 +587,8 @@ namespace HelpDeskSystem.ITSM.Services
                 report.OverallComplianceScore = CalculateOverallCompliance(report);
 
                 // Generate recommendations
-                report.Recommendations = await GenerateComplianceRecommendations(report);
+                var recommendations = await GenerateComplianceRecommendations(report);
+                report.Recommendations = recommendations.Select(r => $"[{r.Priority}] {r.Description}").ToList();
 
                 _logger.LogInformation("Generated ITIL compliance report for period {StartDate} to {EndDate}", 
                     startDate, endDate);
@@ -621,7 +623,8 @@ namespace HelpDeskSystem.ITSM.Services
                 audit.OverallScore = CalculateAuditScore(audit);
 
                 // Generate audit findings
-                audit.Findings = await GenerateAuditFindings(audit);
+                var findings = await GenerateAuditFindings(audit);
+                audit.Findings = findings.Select(f => $"[{f.Severity}] {f.Description}").ToList();
 
                 audit.Status = AuditStatus.Completed;
                 audit.CompletedAt = DateTime.UtcNow;
@@ -656,7 +659,8 @@ namespace HelpDeskSystem.ITSM.Services
                 maturity.OverallMaturityScore = CalculateOverallMaturity(maturity);
 
                 // Generate improvement recommendations
-                maturity.ImprovementRecommendations = await GenerateMaturityImprovementRecommendations(maturity);
+                var recommendations = await GenerateMaturityImprovementRecommendations(maturity);
+                maturity.ImprovementRecommendations = recommendations.Select(r => JsonSerializer.Serialize(r)).ToList();
 
                 _logger.LogInformation("Assessed ITIL maturity with overall score {Score}", maturity.OverallMaturityScore);
                 return maturity;
@@ -913,10 +917,10 @@ namespace HelpDeskSystem.ITSM.Services
 
         private double CalculateOverallCompliance(ITILComplianceReport report)
         {
-            return (report.IncidentManagementCompliance + 
-                    report.ProblemManagementCompliance + 
-                    report.ChangeManagementCompliance + 
-                    report.SLACompliance) / 4.0;
+            return ((report.IncidentManagementCompliance as double?) ?? 0 + 
+                    (report.ProblemManagementCompliance as double?) ?? 0 + 
+                    (report.ChangeManagementCompliance as double?) ?? 0 + 
+                    (report.SLACompliance as double?) ?? 0) / 4.0;
         }
 
         private async Task<List<ComplianceRecommendation>> GenerateComplianceRecommendations(ITILComplianceReport report)
@@ -1124,8 +1128,11 @@ namespace HelpDeskSystem.ITSM.Services
         New,
         Assigned,
         InProgress,
+        Waiting,
+        Escalated,
         Resolved,
         Closed,
+        Reopened,
         Cancelled
     }
 
@@ -1142,6 +1149,7 @@ namespace HelpDeskSystem.ITSM.Services
     {
         New,
         Assessment,
+        PendingApproval,
         Authorization,
         Scheduled,
         Implementation,
@@ -1156,13 +1164,6 @@ namespace HelpDeskSystem.ITSM.Services
         Breached
     }
 
-    public enum AuditStatus
-    {
-        InProgress,
-        Completed,
-        Failed
-    }
-
     public enum MaturityLevel
     {
         Level1,
@@ -1173,17 +1174,69 @@ namespace HelpDeskSystem.ITSM.Services
     }
 
     // Additional ITIL models would be defined here...
-    public class ITILIncident { }
-    public class ITILProblem { }
-    public class ITILChange { }
-    public class ITILSLA { }
+    public class ITILIncident
+    {
+        public string IncidentId { get; set; } = string.Empty;
+        public string IncidentNumber { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Resolution { get; set; } = string.Empty;
+        public string ResolutionCode { get; set; } = string.Empty;
+        public DateTime? ResolvedAt { get; set; }
+        public IncidentStatus Status { get; set; }
+        public string Priority { get; set; } = string.Empty;
+        public string Impact { get; set; } = string.Empty;
+        public string Urgency { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public DateTime LoggedAt { get; set; }
+        public TimeSpan SLATarget { get; set; }
+        public DateTime SLAStartedAt { get; set; }
+    }
+    public class ITILProblem
+    {
+        public string ProblemId { get; set; } = string.Empty;
+        public RCAAnalysis? RCAAnalysis { get; set; }
+        public DateTime? RCACompletedAt { get; set; }
+        public ProblemStatus Status { get; set; }
+    }
+    public class ITILChange
+    {
+        public string ChangeId { get; set; } = string.Empty;
+        public string ChangeNumber { get; set; } = string.Empty;
+        public DateTime RequestedAt { get; set; }
+        public ChangeStatus Status { get; set; }
+        public ChangeImpact Impact { get; set; } = new();
+        public ChangeRisk Risk { get; set; } = new();
+        public string Priority { get; set; } = string.Empty;
+    }
+    public class ITILSLA
+    {
+        public string SLAId { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public SLAStatus Status { get; set; }
+    }
     public class ITILServiceLevel { }
     public class RCAAnalysis { }
     public class ChangeImpact { }
     public class ChangeRisk { }
     public class SLAMonitoring { }
-    public class SLABreach { }
+    public class SLABreach
+    {
+        public int SLAId { get; set; }
+        public string BreachDetails { get; set; } = string.Empty;
+        public DateTime BreachTime { get; set; }
+        public DateTime RecordedAt { get; set; }
+        public BreachStatus Status { get; set; }
+    }
     public class SLAReport { }
+
+    public enum BreachStatus
+    {
+        Open,
+        InProgress,
+        Resolved,
+        Closed
+    }
     public class ITILConfigurationItem { }
     public class ITILRelationship { }
     public class CMDBSnapshot { }
@@ -1212,14 +1265,34 @@ namespace HelpDeskSystem.ITSM.Services
     public class SecurityAssessment { }
     public class ComplianceAudit { }
     public class SecurityReport { }
-    public class ITILComplianceReport { }
-    public class ITILAuditScope { }
-    public class ITILAudit { }
+    // Duplicates - defined in ITSMModels.cs with properties
+    // public class ITILComplianceReport { }
+    public class ITILAuditScope
+    {
+        public List<string> Processes { get; set; } = new();
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+    }
+    // public class ITILAudit { }
     public class ProcessAudit { }
-    public class AuditFinding { }
+    public class AuditFinding
+    {
+        public string Description { get; set; } = string.Empty;
+        public string Severity { get; set; } = string.Empty;
+    }
     public class ITILCertification { }
     public class ITILCertificationLevel { }
-    public class ITILMaturity { }
+    public class ITILMaturity
+    {
+        public DateTime AssessedAt { get; set; }
+        public string Framework { get; set; } = string.Empty;
+        public MaturityLevel IncidentManagementMaturity { get; set; }
+        public MaturityLevel ProblemManagementMaturity { get; set; }
+        public MaturityLevel ChangeManagementMaturity { get; set; }
+        public MaturityLevel SLAManagementMaturity { get; set; }
+        public double OverallMaturityScore { get; set; }
+        public List<string> ImprovementRecommendations { get; set; } = new();
+    }
     public class MaturityRecommendation { }
     public class ITILImprovementPlan { }
     public class ITILAlert { }
@@ -1227,8 +1300,19 @@ namespace HelpDeskSystem.ITSM.Services
     public class ITILMetrics { }
     public class ProblemKPI { }
     public class ChangeKPI { }
-    public class ComplianceRecommendation { }
-    public class ChangeReview { }
+    public class ComplianceRecommendation
+    {
+        public string Description { get; set; } = string.Empty;
+        public string Priority { get; set; } = string.Empty;
+    }
+    public class ChangeReview
+    {
+        public string ReviewerId { get; set; } = string.Empty;
+        public bool Successful { get; set; }
+        public string Comments { get; set; } = string.Empty;
+        public List<string> Issues { get; set; } = new();
+        public DateTime ReviewedAt { get; set; }
+    }
 
     #endregion
 }
