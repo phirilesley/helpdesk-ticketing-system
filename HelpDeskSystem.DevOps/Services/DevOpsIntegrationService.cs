@@ -25,9 +25,9 @@ namespace HelpDeskSystem.DevOps.Services
 
         // CI/CD Integration
         Task<List<CIPipeline>> GetPipelines();
-        Task TriggerPipeline(string pipelineId, Dictionary<string, object> parameters = null);
-        Task<CIBuild> GetBuildStatus(string buildId);
-        Task<List<CIDeployment>> GetDeployments(string environment = null);
+        Task TriggerPipeline(string pipelineId, Dictionary<string, object>? parameters = null);
+        Task<CIBuild?> GetBuildStatus(string buildId);
+        Task<List<CIDeployment>> GetDeployments(string? environment = null);
 
         // Code Review Integration
         Task<List<CodeReview>> GetCodeReviews(string repositoryId);
@@ -36,7 +36,7 @@ namespace HelpDeskSystem.DevOps.Services
         Task RequestChanges(string reviewId, string comment);
 
         // Deploy Tracking
-        Task<List<Deployment>> GetRecentDeployments(string environment = null);
+        Task<List<Deployment>> GetRecentDeployments(string? environment = null);
         Task TrackDeployment(string deploymentId, DeploymentStatus status);
         Task<RollbackPlan> CreateRollbackPlan(string deploymentId);
 
@@ -380,7 +380,7 @@ namespace HelpDeskSystem.DevOps.Services
             }
         }
 
-        public async Task TriggerPipeline(string pipelineId, Dictionary<string, object> parameters = null)
+        public async Task TriggerPipeline(string pipelineId, Dictionary<string, object>? parameters = null)
         {
             try
             {
@@ -401,7 +401,7 @@ namespace HelpDeskSystem.DevOps.Services
             }
         }
 
-        public async Task<CIBuild> GetBuildStatus(string buildId)
+        public async Task<CIBuild?> GetBuildStatus(string buildId)
         {
             try
             {
@@ -431,7 +431,7 @@ namespace HelpDeskSystem.DevOps.Services
             }
         }
 
-        public async Task<List<CIDeployment>> GetDeployments(string environment = null)
+        public async Task<List<CIDeployment>> GetDeployments(string? environment = null)
         {
             try
             {
@@ -565,7 +565,7 @@ namespace HelpDeskSystem.DevOps.Services
 
         #region Deploy Tracking
 
-        public async Task<List<Deployment>> GetRecentDeployments(string environment = null)
+        public async Task<List<Deployment>> GetRecentDeployments(string? environment = null)
         {
             try
             {
@@ -892,7 +892,7 @@ namespace HelpDeskSystem.DevOps.Services
             return new List<CIPipeline>();
         }
 
-        private async Task<List<CIDeployment>> GetAzureDevOpsDeployments(string environment = null)
+        private async Task<List<CIDeployment>> GetAzureDevOpsDeployments(string? environment = null)
         {
             // Implementation for Azure DevOps deployments
             return new List<CIDeployment>();

@@ -585,9 +585,9 @@ namespace HelpDeskSystem.DevOps.Services
 
     public class GitHubReferenceObject
     {
-        public string Sha { get; set; }
-        public string Type { get; set; }
-        public string Url { get; set; }
+        public string Sha { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
     }
 
     #endregion
