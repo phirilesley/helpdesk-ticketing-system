@@ -17,6 +17,9 @@ import Profile from './components/Profile';
 import Settings from './components/Settings';
 import KnowledgeBase from './components/KnowledgeBase';
 import CustomerPortal from './components/CustomerPortal';
+import DevOpsOverview from './components/DevOpsOverview';
+import HROverview from './components/HROverview';
+import MarketingDashboard from './components/MarketingDashboard';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 
@@ -78,7 +81,7 @@ const LoginRoute: React.FC = () => {
     );
   }
 
-  return user ? <Navigate to="/app/dashboard" replace /> : <Login />;
+  return user ? <Navigate to="/app/customer-portal" replace /> : <Login />;
 };
 
 function App() {
@@ -92,9 +95,12 @@ function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<LoginRoute />} />
               <Route path="/app" element={<ProtectedLayout />}>
-                <Route index element={<Navigate to="/app/dashboard" replace />} />
+                <Route index element={<Navigate to="/app/customer-portal" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="customer-portal" element={<CustomerPortal />} />
+                <Route path="devops" element={<DevOpsOverview />} />
+                <Route path="marketing" element={<MarketingDashboard />} />
+                <Route path="hr" element={<HROverview />} />
                 <Route path="admin" element={<AdminDashboard />} />
                 <Route path="enterprise" element={<EnterpriseAdmin />} />
                 <Route path="tickets" element={<TicketList />} />
@@ -108,7 +114,11 @@ function App() {
               <Route path="/customer-portal" element={<Navigate to="/app/customer-portal" replace />} />
               <Route path="/admin" element={<Navigate to="/app/admin" replace />} />
               <Route path="/enterprise" element={<Navigate to="/app/enterprise" replace />} />
+              <Route path="/devops" element={<Navigate to="/app/devops" replace />} />
+              <Route path="/marketing" element={<Navigate to="/app/marketing" replace />} />
+              <Route path="/hr" element={<Navigate to="/app/hr" replace />} />
               <Route path="/tickets" element={<Navigate to="/app/tickets" replace />} />
+              <Route path="/tickets/:id" element={<Navigate to="/app/tickets" replace />} />
               <Route path="/tickets/create" element={<Navigate to="/app/tickets/create" replace />} />
               <Route path="/knowledge-base" element={<Navigate to="/app/knowledge-base" replace />} />
               <Route path="/profile" element={<Navigate to="/app/profile" replace />} />

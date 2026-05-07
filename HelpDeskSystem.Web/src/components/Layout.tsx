@@ -29,7 +29,16 @@ import {
   AccountCircle,
   Logout,
   AdminPanelSettings,
-  SupportAgent
+  SupportAgent,
+  Engineering,
+  Campaign,
+  Groups,
+  Hub,
+  Schema,
+  AccountTree,
+  Lan,
+  ReceiptLong,
+  Timeline
 } from '@mui/icons-material';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -60,27 +69,53 @@ const Layout: React.FC = () => {
     handleProfileMenuClose();
   };
 
+  const roles = user?.roles ?? [];
+  const normalizedRoles = roles.map((r) => String(r).trim().toLowerCase());
+  const hasRole = (role: string) => normalizedRoles.includes(role.toLowerCase());
+  const isSuperAdmin = hasRole('SuperAdmin');
+  const isAdmin = hasRole('Admin');
+  const isAgent = hasRole('Agent');
+  const isCustomer = hasRole('Customer');
+  const canSeeAllMenus = isSuperAdmin;
+
   const menuItems = [
-    { text: 'Customer Portal', icon: <SupportAgent />, path: '/app/customer-portal' },
-    { text: 'Dashboard', icon: <Dashboard />, path: '/app/dashboard' },
-    { text: 'Analytics', icon: <Assessment />, path: '/app/admin' },
-    { text: 'Enterprise', icon: <AdminPanelSettings />, path: '/app/enterprise', adminOnly: true },
-    { text: 'My Tickets', icon: <ConfirmationNumber />, path: '/app/tickets' },
-    { text: 'Create Ticket', icon: <Add />, path: '/app/tickets/create' },
-    { text: 'Knowledge Base', icon: <Book />, path: '/app/knowledge-base' },
-    { text: 'Profile', icon: <Person />, path: '/app/profile' },
-    { text: 'Settings', icon: <Settings />, path: '/app/settings' },
+    { text: 'Customer Portal', icon: <SupportAgent />, path: '/app/customer-portal', visible: true },
+    { text: 'Dashboard', icon: <Dashboard />, path: '/app/dashboard', visible: canSeeAllMenus || !isCustomer },
+    { text: 'DevOps', icon: <Engineering />, path: '/app/devops', visible: canSeeAllMenus || isAdmin || isAgent },
+    { text: 'Marketing', icon: <Campaign />, path: '/app/marketing', visible: canSeeAllMenus || isAdmin },
+    { text: 'HR', icon: <Groups />, path: '/app/hr', visible: canSeeAllMenus || isAdmin },
+    { text: 'ITSM', icon: <ConfirmationNumber />, path: '/app/tickets', visible: canSeeAllMenus || isAdmin },
+    { text: 'Omnichannel', icon: <Hub />, path: '/app/customer-portal', visible: canSeeAllMenus || isAdmin },
+    { text: 'Workflow Builder', icon: <AccountTree />, path: '/app/enterprise', visible: canSeeAllMenus || isAdmin },
+    { text: 'Integrations', icon: <Lan />, path: '/app/enterprise', visible: canSeeAllMenus || isAdmin },
+    { text: 'Projects', icon: <Timeline />, path: '/app/enterprise', visible: canSeeAllMenus || isAdmin },
+    { text: 'Billing', icon: <ReceiptLong />, path: '/app/enterprise', visible: canSeeAllMenus || isAdmin },
+    { text: 'Dependency Graph', icon: <Schema />, path: '/app/enterprise', visible: canSeeAllMenus || isAdmin },
+    { text: 'User Management', icon: <Person />, path: '/app/admin', visible: canSeeAllMenus || isAdmin },
+    { text: 'Roles & Permissions', icon: <AdminPanelSettings />, path: '/app/admin', visible: canSeeAllMenus || isAdmin },
+    { text: 'Audit Logs', icon: <Assessment />, path: '/app/admin', visible: canSeeAllMenus || isAdmin },
+    { text: 'Security Policies', icon: <Settings />, path: '/app/enterprise', visible: canSeeAllMenus || isAdmin },
+    { text: 'Compliance', icon: <Book />, path: '/app/enterprise', visible: canSeeAllMenus || isAdmin },
+    { text: 'Automation Rules', icon: <AccountTree />, path: '/app/enterprise', visible: canSeeAllMenus || isAdmin },
+    { text: 'SLA Advanced', icon: <Timeline />, path: '/app/enterprise', visible: canSeeAllMenus || isAdmin },
+    { text: 'Analytics', icon: <Assessment />, path: '/app/admin', visible: canSeeAllMenus || isAdmin },
+    { text: 'Enterprise', icon: <AdminPanelSettings />, path: '/app/enterprise', visible: canSeeAllMenus || isAdmin },
+    { text: 'My Tickets', icon: <ConfirmationNumber />, path: '/app/tickets', visible: true },
+    { text: 'Create Ticket', icon: <Add />, path: '/app/tickets/create', visible: true },
+    { text: 'Knowledge Base', icon: <Book />, path: '/app/knowledge-base', visible: true },
+    { text: 'Profile', icon: <Person />, path: '/app/profile', visible: true },
+    { text: 'Settings', icon: <Settings />, path: '/app/settings', visible: canSeeAllMenus || !isCustomer || isAgent || isAdmin },
   ];
 
   const drawer = (
     <div>
       <Toolbar sx={{ borderBottom: '1px solid #e2e8f0' }}>
         <Typography variant="h6" noWrap component="div" sx={{ color: '#0f172a' }}>
-          NOVA SERVICE DESK
+          SMART PANDA HELP DESK
         </Typography>
       </Toolbar>
       <List>
-        {menuItems.filter(item => !item.adminOnly || (user?.roles?.includes('Admin') || user?.roles?.includes('SuperAdmin'))).map((item) => (
+        {menuItems.filter(item => item.visible).map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
               selected={location.pathname === item.path}
@@ -131,7 +166,7 @@ const Layout: React.FC = () => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Customer Portal
+            Smart Panda Portal
           </Typography>
           <IconButton
             size="large"

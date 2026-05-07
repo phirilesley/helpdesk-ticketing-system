@@ -38,7 +38,7 @@ const Landing: React.FC = () => {
             <Box sx={{ width: 44, height: 44, borderRadius: 2, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#0f766e 0%,#0ea5e9 55%,#1d4ed8 100%)', boxShadow: '0 14px 26px rgba(15,118,110,.35)' }}>
               <ForumRoundedIcon sx={{ color: '#fff' }} />
             </Box>
-            <Typography variant="h6" sx={{ color: '#0f172a', letterSpacing: 0.2 }}>NOVA SERVICE DESK</Typography>
+            <Typography variant="h6" sx={{ color: '#0f172a', letterSpacing: 0.2 }}>SMART PANDA HELP DESK</Typography>
           </Stack>
           <Stack direction="row" spacing={1.5}>
             <Button component={Link} to="/login" variant="text" sx={{ color: '#0f172a', fontWeight: 600 }}>Sign In</Button>

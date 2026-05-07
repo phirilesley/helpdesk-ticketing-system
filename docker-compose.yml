@@ -39,7 +39,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:80
-      - SeedData__Enabled=false
+      - SeedData__Enabled=true
       - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=HelpDeskSystem;User Id=sa;Password=HelpDesk123!@#;TrustServerCertificate=true;MultipleActiveResultSets=true
       - ConnectionStrings__Redis=redis:6379
       - JwtSettings__SecretKey=YourSuperSecretKeyHere12345678901234567890

@@ -85,6 +85,50 @@ public class UsersController : ControllerBase
         return Ok(users);
     }
 
+    [HttpGet("assignable-agents")]
+    [Authorize(Roles = "Agent,Admin,SuperAdmin")]
+    public async Task<ActionResult<IEnumerable<AssignableUserDto>>> GetAssignableAgents()
+    {
+        if (User.IsInRole("SuperAdmin"))
+        {
+            var superUsers = await _context.Users
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .AsNoTracking()
+                .Where(u => u.IsActive && u.UserRoles.Any(ur => ur.Role != null && ur.Role.Name == "Agent"))
+                .Select(u => new AssignableUserDto
+                {
+                    Id = u.Id,
+                    Email = u.Email,
+                    FullName = $"{u.FirstName} {u.LastName}".Trim()
+                })
+                .ToListAsync(HttpContext.RequestAborted);
+
+            return Ok(superUsers);
+        }
+
+        var tenantId = User.GetTenantId();
+        if (!tenantId.HasValue)
+            return Forbid();
+
+        var users = await _context.Users
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .AsNoTracking()
+            .Where(u => u.IsActive
+                && u.TenantId == tenantId.Value
+                && u.UserRoles.Any(ur => ur.Role != null && ur.Role.Name == "Agent"))
+            .Select(u => new AssignableUserDto
+            {
+                Id = u.Id,
+                Email = u.Email,
+                FullName = $"{u.FirstName} {u.LastName}".Trim()
+            })
+            .ToListAsync(HttpContext.RequestAborted);
+
+        return Ok(users);
+    }
+
     [HttpPut("{id}")]
     [Authorize]
     public async Task<IActionResult> UpdateUser(int id, UpdateUserDto dto)
@@ -329,4 +373,11 @@ public class UsersController : ControllerBase
     private string GetDeviceId() => Request.Headers["X-Device-Id"].ToString();
 
     private string GetDeviceName() => Request.Headers["X-Device-Name"].ToString();
+}
+
+public class AssignableUserDto
+{
+    public int Id { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
 }

@@ -88,7 +88,7 @@ const TicketList: React.FC = () => {
         </Typography>
         <Button
           variant="contained"
-          onClick={() => navigate('/tickets/create')}
+          onClick={() => navigate('/app/tickets/create')}
         >
           Create New Ticket
         </Button>
@@ -135,14 +135,12 @@ const TicketList: React.FC = () => {
           <Grid item xs={12} md={6} lg={4} key={ticket.id}>
             <Card
               sx={{
-                cursor: 'pointer',
                 '&:hover': {
                   elevation: 4,
                   transform: 'translateY(-2px)',
                   transition: 'all 0.2s ease-in-out'
                 }
               }}
-              onClick={() => navigate(`/tickets/${ticket.id}`)}
             >
               <CardContent>
                 <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
@@ -179,6 +177,15 @@ const TicketList: React.FC = () => {
                   <Typography variant="caption" color="text.secondary">
                     {format(new Date(ticket.createdAt), 'MMM dd, yyyy')}
                   </Typography>
+                </Box>
+                <Box mt={2}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    onClick={() => navigate(`/app/tickets/${ticket.id}`)}
+                  >
+                    Open Ticket
+                  </Button>
                 </Box>
               </CardContent>
             </Card>

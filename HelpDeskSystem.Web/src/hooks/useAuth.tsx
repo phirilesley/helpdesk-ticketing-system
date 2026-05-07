@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
     setUser(userData);
     
-    navigate('/dashboard');
+    navigate('/app/customer-portal');
   };
 
   const logout = () => {

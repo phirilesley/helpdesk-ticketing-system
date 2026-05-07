@@ -130,6 +130,12 @@ public class TicketsController : ControllerBase
         if (!CanAccessTicket(ticket))
             return Forbid();
 
+        if (request.Status == TicketStatus.Closed && !User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        if (request.Status == TicketStatus.Resolved && string.IsNullOrWhiteSpace(request.Comment))
+            return BadRequest("Resolution note is required when resolving a ticket.");
+
         await _ticketService.ChangeTicketStatusAsync(id, request.Status, userId.Value, request.Comment);
         return NoContent();
     }

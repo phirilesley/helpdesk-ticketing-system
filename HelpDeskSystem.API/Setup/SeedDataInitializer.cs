@@ -23,9 +23,46 @@ public static class SeedDataInitializer
 
         var tenant = await EnsureTenantAsync(context, options, cancellationToken);
         await EnsureRolesAsync(context, cancellationToken);
-        var adminUser = await EnsureSuperAdminUserAsync(userService, options, tenant.Id);
-        await EnsureRoleAssignedAsync(context, adminUser.Id, "SuperAdmin", cancellationToken);
+        var superAdminUser = await EnsureUserAsync(
+            userService,
+            options.SuperAdminUsername,
+            options.SuperAdminEmail,
+            options.SuperAdminPassword,
+            options.SuperAdminFirstName,
+            options.SuperAdminLastName,
+            tenant.Id);
+        await EnsureRoleAssignedAsync(context, superAdminUser.Id, "SuperAdmin", cancellationToken);
+        await EnsureRoleAssignedAsync(context, superAdminUser.Id, "Admin", cancellationToken);
+
+        var adminUser = await EnsureUserAsync(
+            userService,
+            options.AdminUsername,
+            options.AdminEmail,
+            options.AdminPassword,
+            options.AdminFirstName,
+            options.AdminLastName,
+            tenant.Id);
         await EnsureRoleAssignedAsync(context, adminUser.Id, "Admin", cancellationToken);
+
+        var agentUser = await EnsureUserAsync(
+            userService,
+            options.AgentUsername,
+            options.AgentEmail,
+            options.AgentPassword,
+            options.AgentFirstName,
+            options.AgentLastName,
+            tenant.Id);
+        await EnsureRoleAssignedAsync(context, agentUser.Id, "Agent", cancellationToken);
+
+        var customerUser = await EnsureUserAsync(
+            userService,
+            options.CustomerUsername,
+            options.CustomerEmail,
+            options.CustomerPassword,
+            options.CustomerFirstName,
+            options.CustomerLastName,
+            tenant.Id);
+        await EnsureRoleAssignedAsync(context, customerUser.Id, "Customer", cancellationToken);
         await EnsureTicketMetadataAsync(context, cancellationToken);
         await EnsureEscalationRulesAsync(context, cancellationToken);
         await EnsureAutomationRulesAsync(context, cancellationToken);
@@ -74,22 +111,26 @@ public static class SeedDataInitializer
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task<UserDto> EnsureSuperAdminUserAsync(
+    private static async Task<UserDto> EnsureUserAsync(
         IUserService userService,
-        SeedDataOptions options,
+        string username,
+        string email,
+        string password,
+        string firstName,
+        string lastName,
         int tenantId)
     {
-        var existing = await userService.GetUserByEmailAsync(options.SuperAdminEmail);
+        var existing = await userService.GetUserByEmailAsync(email);
         if (existing != null)
             return existing;
 
         var created = await userService.CreateUserAsync(new CreateUserDto
         {
-            Username = options.SuperAdminUsername,
-            Email = options.SuperAdminEmail,
-            Password = options.SuperAdminPassword,
-            FirstName = options.SuperAdminFirstName,
-            LastName = options.SuperAdminLastName,
+            Username = username,
+            Email = email,
+            Password = password,
+            FirstName = firstName,
+            LastName = lastName,
             TenantId = tenantId
         });
 

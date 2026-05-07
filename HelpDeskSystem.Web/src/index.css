@@ -31,3 +31,12 @@ html, body, #root {
     transform: translateY(0);
   }
 }
+
+@keyframes sway {
+  from {
+    transform: translateX(-1.5%) translateY(-1%);
+  }
+  to {
+    transform: translateX(1.5%) translateY(1%);
+  }
+}

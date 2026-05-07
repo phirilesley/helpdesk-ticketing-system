@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Paper,
@@ -15,7 +15,7 @@ import {
 import { useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery } from 'react-query';
 import { useNavigate } from 'react-router-dom';
-import { createTicket, getTicketCategories, getTicketPriorities } from '../services/api';
+import { createTicket, getTicketCategories, getTicketPriorities, uploadAttachment } from '../services/api';
 
 interface CreateTicketForm {
   title: string;
@@ -27,6 +27,8 @@ interface CreateTicketForm {
 const CreateTicket: React.FC = () => {
   const navigate = useNavigate();
   const { control, handleSubmit, formState: { errors } } = useForm<CreateTicketForm>();
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploadError, setUploadError] = useState<string>('');
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery(
     'ticket-categories',
@@ -38,8 +40,16 @@ const CreateTicket: React.FC = () => {
   );
 
   const createTicketMutation = useMutation(createTicket, {
-    onSuccess: () => {
-      navigate('/tickets');
+    onSuccess: async (createdTicket) => {
+      setUploadError('');
+      if (files.length > 0) {
+        try {
+          await Promise.all(files.map((file) => uploadAttachment(createdTicket.id, file)));
+        } catch {
+          setUploadError('Ticket created, but one or more attachments failed to upload.');
+        }
+      }
+      navigate('/app/tickets');
     },
   });
 
@@ -65,6 +75,11 @@ const CreateTicket: React.FC = () => {
         {createTicketMutation.isError && (
           <Alert severity="error" sx={{ mb: 2 }}>
             Failed to create ticket. Please try again.
+          </Alert>
+        )}
+        {uploadError && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {uploadError}
           </Alert>
         )}
 
@@ -107,6 +122,25 @@ const CreateTicket: React.FC = () => {
                 />
               )}
             />
+
+            <Button variant="outlined" component="label" sx={{ mt: 2 }}>
+              Upload attachments (image, PDF, Word)
+              <input
+                hidden
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx"
+                onChange={(e) => {
+                  const selectedFiles = Array.from(e.target.files ?? []);
+                  setFiles(selectedFiles);
+                }}
+              />
+            </Button>
+            {files.length > 0 && (
+              <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+                {files.length} file(s) selected: {files.map((file) => file.name).join(', ')}
+              </Typography>
+            )}
 
             <Controller
               name="categoryId"
@@ -164,7 +198,7 @@ const CreateTicket: React.FC = () => {
               </Button>
               <Button
                 variant="outlined"
-                onClick={() => navigate('/tickets')}
+                onClick={() => navigate('/app/tickets')}
                 disabled={createTicketMutation.isLoading}
               >
                 Cancel

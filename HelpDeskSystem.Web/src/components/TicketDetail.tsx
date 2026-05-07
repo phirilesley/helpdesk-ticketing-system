@@ -17,9 +17,11 @@ import {
   ListItemText,
   ListItemAvatar
 } from '@mui/material';
+import Autocomplete from '@mui/material/Autocomplete';
 import { format } from 'date-fns';
 import { useParams, useNavigate } from 'react-router-dom';
-import { addComment, getTicket, getTicketComments, Ticket, TicketComment } from '../services/api';
+import { addComment, assignTicket, changeTicketStatus, getAssignableAgents, getTicket, getTicketComments, Ticket, TicketComment, AssignableUser } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 const TicketDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +32,26 @@ const TicketDetail: React.FC = () => {
   const [error, setError] = useState('');
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [status, setStatus] = useState('InProgress');
+  const [statusComment, setStatusComment] = useState('');
+  const [assignUserId, setAssignUserId] = useState('');
+  const [assignReason, setAssignReason] = useState('');
+  const [updating, setUpdating] = useState(false);
+  const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+  const { user } = useAuth();
+
+  const roles = user?.roles ?? [];
+  const normalizedRoles = roles.map((r) => String(r).trim().toLowerCase());
+  const isAdmin = normalizedRoles.includes('admin') || normalizedRoles.includes('superadmin');
+  const isAgent = normalizedRoles.includes('agent');
+  const canOperate = isAdmin || isAgent;
+
+  const formatDateSafe = (value?: string | null) => {
+    if (!value) return 'N/A';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return 'N/A';
+    return format(parsed, 'MMM dd, yyyy HH:mm');
+  };
 
   useEffect(() => {
     if (!id) {
@@ -51,6 +73,7 @@ const TicketDetail: React.FC = () => {
           getTicketComments(ticketId)
         ]);
         setTicket(ticketResult);
+        setStatus(ticketResult.status);
         setComments(commentsResult);
       } catch {
         setError('Failed to fetch ticket details');
@@ -61,6 +84,23 @@ const TicketDetail: React.FC = () => {
 
     fetchData();
   }, [id]);
+
+  useEffect(() => {
+    if (!canOperate) {
+      return;
+    }
+
+    const loadAssignableUsers = async () => {
+      try {
+        const users = await getAssignableAgents();
+        setAssignableUsers(users);
+      } catch {
+        setAssignableUsers([]);
+      }
+    };
+
+    loadAssignableUsers();
+  }, [canOperate]);
 
   const handleAddComment = async () => {
     if (!newComment.trim() || !ticket) {
@@ -82,8 +122,61 @@ const TicketDetail: React.FC = () => {
     }
   };
 
+  const handleStatusUpdate = async () => {
+    if (!ticket || !canOperate) {
+      return;
+    }
+
+    if (status === 'Resolved' && !statusComment.trim()) {
+      setError('Please add a resolution explanation.');
+      return;
+    }
+
+    if (status === 'Closed' && !isAdmin) {
+      setError('Only Admin/SuperAdmin can close tickets.');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      setError('');
+      await changeTicketStatus(ticket.id, status as any, statusComment);
+      const latest = await getTicket(ticket.id);
+      setTicket(latest);
+    } catch (e: any) {
+      setError(e?.response?.data || 'Failed to update status');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!ticket || !canOperate) {
+      return;
+    }
+
+    const parsedUserId = parseInt(assignUserId, 10);
+    if (Number.isNaN(parsedUserId) || parsedUserId <= 0) {
+      setError('Enter a valid assignee user ID.');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      setError('');
+      await assignTicket(ticket.id, parsedUserId, assignReason || 'Re-assigned by operator');
+      const latest = await getTicket(ticket.id);
+      setTicket(latest);
+      setAssignReason('');
+    } catch (e: any) {
+      setError(e?.response?.data || 'Failed to assign ticket');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch ((status || '').toLowerCase()) {
       case 'new': return 'info';
       case 'inprogress': return 'warning';
       case 'waiting': return 'secondary';
@@ -95,7 +188,7 @@ const TicketDetail: React.FC = () => {
   };
 
   const getPriorityColor = (priority: string) => {
-    switch (priority.toLowerCase()) {
+    switch ((priority || '').toLowerCase()) {
       case 'critical': return 'error';
       case 'high': return 'warning';
       case 'medium': return 'info';
@@ -116,7 +209,7 @@ const TicketDetail: React.FC = () => {
     return (
       <Box p={4}>
         <Alert severity="error">{error || 'Ticket not found'}</Alert>
-        <Button onClick={() => navigate('/tickets')} sx={{ mt: 2 }}>
+        <Button onClick={() => navigate('/app/tickets')} sx={{ mt: 2 }}>
           Back to Tickets
         </Button>
       </Box>
@@ -129,7 +222,7 @@ const TicketDetail: React.FC = () => {
         <Typography variant="h4" component="h1">
           {ticket.ticketNumber}
         </Typography>
-        <Button variant="outlined" onClick={() => navigate('/tickets')}>
+        <Button variant="outlined" onClick={() => navigate('/app/tickets')}>
           Back to Tickets
         </Button>
       </Box>
@@ -161,6 +254,65 @@ const TicketDetail: React.FC = () => {
               </Typography>
 
               <Divider sx={{ my: 2 }} />
+              {canOperate && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h6" gutterBottom>Agent/Admin Actions</Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        select
+                        SelectProps={{ native: true }}
+                        fullWidth
+                        label="Status"
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                      >
+                        {['New', 'InProgress', 'Waiting', 'Resolved', 'Reopened', 'Escalated', ...(isAdmin ? ['Closed'] : [])].map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </TextField>
+                    </Grid>
+                    <Grid item xs={12} md={8}>
+                      <TextField
+                        fullWidth
+                        label="Status Note (required when resolving)"
+                        value={statusComment}
+                        onChange={(e) => setStatusComment(e.target.value)}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Button variant="contained" onClick={handleStatusUpdate} disabled={updating}>
+                        Update Status
+                      </Button>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <Autocomplete
+                        options={assignableUsers}
+                        value={assignableUsers.find((u) => String(u.id) === assignUserId) ?? null}
+                        onChange={(_, value) => setAssignUserId(value ? String(value.id) : '')}
+                        getOptionLabel={(option) => `${option.fullName || option.email} (${option.email})`}
+                        isOptionEqualToValue={(option, value) => option.id === value.id}
+                        renderInput={(params) => (
+                          <TextField {...params} label="Assign To Agent" placeholder="Search agent by name/email" />
+                        )}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={8}>
+                      <TextField
+                        fullWidth
+                        label="Assignment Reason"
+                        value={assignReason}
+                        onChange={(e) => setAssignReason(e.target.value)}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Button variant="outlined" onClick={handleAssign} disabled={updating}>
+                        Reassign Ticket
+                      </Button>
+                    </Grid>
+                  </Grid>
+                </Box>
+              )}
 
               <Typography variant="h6" gutterBottom>
                 Comments
@@ -201,7 +353,7 @@ const TicketDetail: React.FC = () => {
                             User {comment.senderUserId}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {format(new Date(comment.createdAt), 'MMM dd, yyyy HH:mm')}
+                            {formatDateSafe(comment.createdAt)}
                           </Typography>
                         </Box>
                       )}
@@ -231,7 +383,7 @@ const TicketDetail: React.FC = () => {
                     Created
                   </Typography>
                   <Typography variant="body2">
-                    {format(new Date(ticket.createdAt), 'MMM dd, yyyy HH:mm')}
+                    {formatDateSafe(ticket.createdAt)}
                   </Typography>
                 </Box>
 
@@ -240,7 +392,7 @@ const TicketDetail: React.FC = () => {
                     Last Updated
                   </Typography>
                   <Typography variant="body2">
-                    {format(new Date(ticket.updatedAt), 'MMM dd, yyyy HH:mm')}
+                    {formatDateSafe(ticket.updatedAt)}
                   </Typography>
                 </Box>
 

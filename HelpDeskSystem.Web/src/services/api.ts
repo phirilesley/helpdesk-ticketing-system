@@ -41,6 +41,38 @@ export interface TicketMetadataOption {
   name: string;
 }
 
+export interface AssignableUser {
+  id: number;
+  email: string;
+  fullName: string;
+}
+
+export interface KnowledgeBaseCategory {
+  id: number;
+  tenantId: number;
+  name: string;
+  description: string;
+  isPublic: boolean;
+  displayOrder: number;
+}
+
+export interface KnowledgeBaseArticle {
+  id: number;
+  tenantId: number;
+  categoryId: number;
+  categoryName: string;
+  slug: string;
+  title: string;
+  summary: string;
+  body: string;
+  searchKeywords: string;
+  isPublished: boolean;
+  publishedAtUtc?: string | null;
+  versionCount: number;
+  helpfulCount: number;
+  unhelpfulCount: number;
+}
+
 const statusMap: Record<number, string> = {
   1: 'New',
   2: 'InProgress',
@@ -172,6 +204,23 @@ export const addComment = async (
   };
 };
 
+export const assignTicket = async (ticketId: number, userId: number, reason: string): Promise<void> => {
+  await axios.post(`/api/tickets/${ticketId}/assign`, { userId, reason });
+};
+
+export const changeTicketStatus = async (
+  ticketId: number,
+  status: 'New' | 'InProgress' | 'Waiting' | 'Resolved' | 'Closed' | 'Reopened' | 'Escalated',
+  comment: string
+): Promise<void> => {
+  await axios.post(`/api/tickets/${ticketId}/status`, { status, comment });
+};
+
+export const getAssignableAgents = async (): Promise<AssignableUser[]> => {
+  const response = await axios.get('/api/users/assignable-agents');
+  return Array.isArray(response.data) ? response.data : [];
+};
+
 export const getTicketCategories = async (): Promise<TicketMetadataOption[]> => {
   const response = await axios.get('/api/tickets/metadata/categories');
   return Array.isArray(response.data) ? response.data : [];
@@ -192,6 +241,23 @@ export const uploadAttachment = async (ticketId: number, file: File): Promise<an
     },
   });
   return response.data;
+};
+
+export const getKnowledgeBaseCategories = async (): Promise<KnowledgeBaseCategory[]> => {
+  const response = await axios.get('/api/knowledge-base/categories');
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const getKnowledgeBaseArticles = async (params: { q?: string; categoryId?: number }): Promise<KnowledgeBaseArticle[]> => {
+  const response = await axios.get('/api/knowledge-base/articles', { params });
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const addKnowledgeBaseFeedback = async (
+  articleId: number,
+  payload: { isHelpful: boolean; comment: string }
+): Promise<void> => {
+  await axios.post(`/api/knowledge-base/articles/${articleId}/feedback`, payload);
 };
 
 // Twilio Integration APIs
